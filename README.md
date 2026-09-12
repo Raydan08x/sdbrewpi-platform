@@ -15,6 +15,7 @@ Abrir:
 - WebApp: <http://localhost:8080>
 - API: <http://localhost:8081/api/v1/fermentation/overview>
 - Salud: <http://localhost:8081/actuator/health>
+- Estado MQTT: <http://localhost:8081/api/v1/telemetry/status>
 
 Detener con `docker compose down`. Los datos quedan en el volumen `postgres-data`.
 
@@ -35,7 +36,19 @@ npm run dev -- --host 127.0.0.1
 
 ## Estado operativo
 
-`SIMULATION` es el único entorno habilitado. La aplicación no acciona GPIO, relés ni Modbus. La integración física se habilitará después de validar modelos, cableado, sensores e interlocks en banco.
+`SIMULATION` está habilitado por defecto. La aplicación no acciona GPIO, relés ni Modbus. El modo `LIVE_READ_ONLY` permite consumir las Pills sin habilitar ninguna salida física.
+
+Para la prueba MQTT, configura las variables en una terminal o en un archivo `.env` local que Git ignora:
+
+```powershell
+$env:MQTT_ENABLED="true"
+$env:SIMULATION_ENABLED="false"
+$env:MQTT_BROKER_URI="tcp://192.168.1.15:1883"
+$env:MQTT_USERNAME="usuario-local"
+$env:MQTT_PASSWORD="contraseña-local"
+```
+
+El estado del enlace, los mensajes aceptados y rechazados aparecen en la WebApp. Los mensajes históricos y los valores retenidos sin timestamp se guardan, pero no actualizan el estado utilizado por el control.
 
 ## Alcance del producto
 

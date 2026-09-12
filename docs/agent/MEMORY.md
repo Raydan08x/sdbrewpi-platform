@@ -7,6 +7,8 @@
 - Monolito modular para el negocio; control físico desacoplado.
 - Dos tanques en el primer incremento.
 - Pruebas en PC y simulación antes de conectar hardware.
+- MQTT se integra primero en modo de solo lectura; `hardware.enabled=false` permanece obligatorio.
+- Los tópicos retenidos sin timestamp y `/history` nunca alimentan el control actual.
 
 ## Hardware identificado
 
@@ -19,4 +21,5 @@
 ## Estado
 
 - M0 implementa una cadena simulada y no acciona hardware.
-
+- El adaptador M1 acepta los tópicos actuales `sierra/rapt/...` y `rapt/pill/...`, además del contrato `sdbrewpi/v1/...`.
+- El broker documentado en la red anterior no fue alcanzable desde la PC durante el QA del 2026-09-12.

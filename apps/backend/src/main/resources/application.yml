@@ -16,6 +16,14 @@ sdbrewpi:
   hardware:
     enabled: ${HARDWARE_ENABLED:false}
   simulation:
-    enabled: true
+    enabled: ${SIMULATION_ENABLED:true}
+  mqtt:
+    enabled: ${MQTT_ENABLED:false}
+    broker-uri: ${MQTT_BROKER_URI:tcp://192.168.1.15:1883}
+    client-id: ${MQTT_CLIENT_ID:sdbrewpi-platform-local}
+    username: ${MQTT_USERNAME:}
+    password: ${MQTT_PASSWORD:}
+    topics: ${MQTT_TOPICS:sierra/rapt/+/telemetry,rapt/pill/+/history,rapt/pill/+/temperature,rapt/pill/+/gravity,rapt/pill/+/battery,rapt/pill/+/rssi,sdbrewpi/v1/+/+/telemetry}
+    freshness-seconds: ${MQTT_FRESHNESS_SECONDS:90}
   web:
     allowed-origins: http://localhost:5173,http://127.0.0.1:5173,http://localhost:8080,http://127.0.0.1:8080

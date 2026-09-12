@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Activity, AlertTriangle, BarChart3, Beer, Boxes, Building2, ChevronRight, CircleGauge, Factory, FlaskConical, Gauge, PackageSearch, RefreshCw, Snowflake, Users } from 'lucide-react'
+import { Activity, AlertTriangle, BarChart3, BatteryMedium, Beer, Boxes, Building2, ChevronRight, CircleGauge, Factory, FlaskConical, Gauge, PackageSearch, Radio, RefreshCw, Signal, Snowflake, Users } from 'lucide-react'
 import { getOverview, setMode, setSetpoint } from './api'
 import type { ControlMode, Overview, Tank } from './types'
 
@@ -34,8 +34,11 @@ function TankCard({ tank, busy, onMode, onSetpoint }: { tank: Tank; busy: boolea
         <div className="primary-reading"><small>TEMP. PRODUCTO</small><strong>{tank.productTemperatureC.toFixed(1)}<sup>°C</sup></strong><span className={delta > .35 ? 'warm' : 'stable'}>{delta > .35 ? `+${delta.toFixed(1)} °C sobre objetivo` : 'Dentro del rango'}</span></div>
         <div className="reading-grid">
           <div><small>DENSIDAD</small><b>{tank.gravity.toFixed(4)}</b><span>SG</span></div>
-          <div><small>PILL</small><b>{tank.pillQuality}</b><span>hace {tank.pillAgeSeconds}s</span></div>
+          <div><small>PILL</small><b>{tank.pillQuality}</b><span>{tank.pillSource} · hace {tank.pillAgeSeconds}s</span></div>
         </div>
+        {(tank.pillBatteryPct !== null || tank.pillRssiDbm !== null) && <div className="sensor-meta">
+          <span><BatteryMedium size={13}/>{tank.pillBatteryPct ?? '—'}%</span><span><Signal size={13}/>{tank.pillRssiDbm ?? '—'} dBm</span>
+        </div>}
       </div>
     </div>
     <div className="control-strip">
@@ -75,9 +78,13 @@ export default function App() {
     </aside>
     <main>
       <header><div><span className="eyebrow">CONTROL DE PROCESO</span><h1>Fermentación</h1><p>Dos tanques · circuito de frío compartido</p></div><button className="refresh" onClick={load}><RefreshCw size={17}/> Actualizar</button></header>
-      <div className="simulation-banner"><AlertTriangle size={20}/><div><b>Entorno de simulación</b><span>Las órdenes se validan y auditan, pero ninguna salida física está habilitada.</span></div></div>
+      <div className="simulation-banner"><AlertTriangle size={20}/><div><b>{overview?.environment === 'LIVE_READ_ONLY' ? 'Telemetría real en modo de solo lectura' : 'Entorno de simulación'}</b><span>Ninguna salida física está habilitada.</span></div></div>
       {error && <div className="message error">{error}</div>}{notice && <div className="message success">{notice}</div>}
       {!overview ? <div className="loading"><RefreshCw className="spin"/>Conectando con el backend…</div> : <>
+        <section className={'telemetry-state ' + (overview.telemetry.connected ? 'online' : overview.telemetry.enabled ? 'waiting' : 'disabled')}>
+          <Radio size={18}/><div><b>MQTT</b><span>{overview.telemetry.detail}</span></div>
+          <small>{overview.telemetry.acceptedMessages} aceptados · {overview.telemetry.rejectedMessages} rechazados</small>
+        </section>
         <section className="metrics">
           <div><span><Activity size={18}/>Tanques activos</span><b>{overview.tanks.filter(t => t.mode !== 'OFF').length}<small>/ {overview.tanks.length}</small></b></div>
           <div><span><Snowflake size={18}/>Demandas de frío</span><b>{overview.tanks.filter(t => t.coolingDemand).length}</b></div>

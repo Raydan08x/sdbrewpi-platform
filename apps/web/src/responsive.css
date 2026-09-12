@@ -3,3 +3,66 @@
     grid-template-columns: 1fr;
   }
 }
+
+.telemetry-state {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 10px;
+  align-items: center;
+  margin: -6px 0 18px;
+  padding: 10px 13px;
+  border: 1px solid #284055;
+  border-radius: 8px;
+  color: #708ba0;
+  background: #091725;
+}
+
+.telemetry-state b,
+.telemetry-state span {
+  display: block;
+}
+
+.telemetry-state b {
+  color: #d7e7ef;
+  font-size: 11px;
+}
+
+.telemetry-state span,
+.telemetry-state small {
+  font-size: 9px;
+  margin-top: 2px;
+}
+
+.telemetry-state.online {
+  color: #56e5a0;
+  border-color: #24624f;
+}
+
+.telemetry-state.waiting {
+  color: #f2b84b;
+  border-color: #6d5225;
+}
+
+.sensor-meta {
+  display: flex;
+  gap: 14px;
+  margin-top: 11px;
+  color: #7894a9;
+  font-size: 9px;
+}
+
+.sensor-meta span {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+@media (max-width: 620px) {
+  .telemetry-state {
+    grid-template-columns: auto 1fr;
+  }
+
+  .telemetry-state small {
+    display: none;
+  }
+}

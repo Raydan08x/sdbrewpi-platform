@@ -10,7 +10,11 @@ export interface Tank {
   pillId: string
   pillQuality: string
   pillCapturedAt: string
+  pillReceivedAt: string | null
   pillAgeSeconds: number
+  pillBatteryPct: number | null
+  pillRssiDbm: number | null
+  pillSource: string
   coolingDemand: boolean
   revision: number
 }
@@ -31,5 +35,12 @@ export interface Overview {
   generatedAt: string
   tanks: Tank[]
   chiller: Chiller
+  telemetry: {
+    enabled: boolean
+    connected: boolean
+    lastMessageAt: string | null
+    acceptedMessages: number
+    rejectedMessages: number
+    detail: string
+  }
 }
-

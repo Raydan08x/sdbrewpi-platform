@@ -25,6 +25,7 @@ class FermentationControllerTest {
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.environment").value("SIMULATION"))
             .andExpect(jsonPath("$.tanks.length()").value(2))
+            .andExpect(jsonPath("$.telemetry.enabled").value(false))
             .andExpect(jsonPath("$.chiller.hardwareEnabled").value(false));
     }
 

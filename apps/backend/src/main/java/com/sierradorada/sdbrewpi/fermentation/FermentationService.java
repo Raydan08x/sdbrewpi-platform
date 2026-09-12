@@ -2,6 +2,8 @@ package com.sierradorada.sdbrewpi.fermentation;
 
 import com.sierradorada.sdbrewpi.shared.TankNotFoundException;
 import com.sierradorada.sdbrewpi.shared.RevisionConflictException;
+import com.sierradorada.sdbrewpi.telemetry.MqttProperties;
+import com.sierradorada.sdbrewpi.telemetry.TelemetryRuntimeStatus;
 import java.time.Instant;
 import java.util.UUID;
 import org.springframework.beans.factory.annotation.Value;
@@ -15,17 +17,23 @@ public class FermentationService {
     private final FermentationRepository repository;
     private final boolean hardwareEnabled;
     private final boolean simulationEnabled;
+    private final MqttProperties mqttProperties;
+    private final TelemetryRuntimeStatus telemetryStatus;
 
     public FermentationService(FermentationRepository repository,
             @Value("${sdbrewpi.hardware.enabled:false}") boolean hardwareEnabled,
-            @Value("${sdbrewpi.simulation.enabled:true}") boolean simulationEnabled) {
+            @Value("${sdbrewpi.simulation.enabled:true}") boolean simulationEnabled,
+            MqttProperties mqttProperties, TelemetryRuntimeStatus telemetryStatus) {
         this.repository = repository;
         this.hardwareEnabled = hardwareEnabled;
         this.simulationEnabled = simulationEnabled;
+        this.mqttProperties = mqttProperties;
+        this.telemetryStatus = telemetryStatus;
     }
 
     public FermentationOverview overview() {
-        return new FermentationOverview(hardwareEnabled ? "HARDWARE" : "SIMULATION", Instant.now(), repository.findTanks(), repository.findChiller(hardwareEnabled));
+        String environment = hardwareEnabled ? "HARDWARE" : mqttProperties.enabled() ? "LIVE_READ_ONLY" : "SIMULATION";
+        return new FermentationOverview(environment, Instant.now(), repository.findTanks(), repository.findChiller(hardwareEnabled), telemetryStatus.view());
     }
 
     @Transactional
@@ -65,7 +73,7 @@ public class FermentationService {
     @Scheduled(fixedDelay = 2000)
     @Transactional
     public void simulate() {
-        if (!simulationEnabled || hardwareEnabled) return;
+        if (!simulationEnabled || hardwareEnabled || mqttProperties.enabled()) return;
         boolean anyDemand = false;
         Instant now = Instant.now();
         for (TankView tank : repository.findTanks()) {

@@ -53,8 +53,19 @@ public class FermentationRepository {
         long age = Math.max(0, java.time.Duration.between(captured, Instant.now()).toSeconds());
         return new TankView(rs.getString("id"), rs.getString("name"), ControlMode.valueOf(rs.getString("mode")),
             rs.getDouble("setpoint_c"), rs.getDouble("product_temp_c"), rs.getDouble("gravity"),
-            rs.getString("pill_id"), rs.getString("pill_quality"), captured, age,
+            rs.getString("pill_id"), rs.getString("pill_quality"), captured, nullableInstant(rs, "pill_received_at"), age,
+            nullableInteger(rs, "pill_battery_pct"), nullableInteger(rs, "pill_rssi_dbm"), rs.getString("pill_source"),
             rs.getBoolean("cooling_demand"), rs.getLong("revision"));
+    }
+
+    private Instant nullableInstant(java.sql.ResultSet rs, String column) throws java.sql.SQLException {
+        Timestamp value = rs.getTimestamp(column);
+        return value == null ? null : value.toInstant();
+    }
+
+    private Integer nullableInteger(java.sql.ResultSet rs, String column) throws java.sql.SQLException {
+        int value = rs.getInt(column);
+        return rs.wasNull() ? null : value;
     }
 
     private Double nullableDouble(java.sql.ResultSet rs, String column) throws java.sql.SQLException {

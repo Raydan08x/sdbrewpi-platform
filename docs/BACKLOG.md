@@ -8,15 +8,18 @@
 - [x] Setpoints y modos validados.
 - [x] Bitácora de comandos.
 - [x] Dashboard adaptable.
-- [ ] Integrar MQTT de los repetidores actuales.
+- [x] Adaptador MQTT de solo lectura para los repetidores actuales.
 
 ## M1 — Telemetría real, todavía sin actuación
 
-- Contrato MQTT versionado con `capturedAt`, `receivedAt`, `sequence`, `quality` e identidad estable.
-- Adaptador de compatibilidad para tópicos `rapt/pill/...`.
-- Asociación Pill, tanque y lote con historial.
-- Alarmas de lectura atrasada, batería y pérdida de repetidor.
-- Curvas de temperatura y gravedad.
+- [x] Contrato MQTT versionado con `capturedAt`, `receivedAt`, `sequence`, `quality` e identidad estable.
+- [x] Adaptador de compatibilidad para tópicos `rapt/pill/...` y `sierra/rapt/...`.
+- [x] Asociación Pill-tanque e historial de telemetría.
+- [x] Estado `STALE` para lecturas atrasadas y estado de conexión MQTT.
+- [ ] Actualizar los repetidores para publicar una muestra atómica con `capturedAt`, `messageId` y `sequence`.
+- [ ] Asociación con lote activo.
+- [ ] Alarmas persistentes de batería y pérdida de repetidor.
+- [ ] Curvas de temperatura y gravedad.
 
 ## M2 — Perfiles y trazabilidad
 
@@ -28,6 +31,7 @@
 ## M3 — Banco de hardware
 
 - Identificar módulo de relés, variador, bomba y sensores.
+- Confirmar modelos, diagramas eléctricos, niveles de señal y protocolos del PLC, relés y variador.
 - Firmware de HMI principal y auxiliar.
 - Firmware/controlador con watchdog y estado seguro.
 - Pruebas con salidas de baja tensión, sin cargas de potencia.
@@ -48,4 +52,3 @@
 - Ventas, clientes y CRM.
 - Cuentas de cobro, tesorería y contabilidad.
 - Mantenimiento, calidad, costos y reportes.
-

@@ -27,10 +27,12 @@ docker compose down
 
 ## Línea base verificada — 2026-09-12
 
-- Backend: 8 pruebas aprobadas, incluidas histéresis, validación, concurrencia y CORS local.
+- Backend: 17 pruebas aprobadas, incluidas histéresis, validación, concurrencia, CORS, parsing MQTT, ingestión segura y endpoints de telemetría.
 - Frontend: lint, compilación TypeScript/Vite y auditoría npm sin vulnerabilidades.
 - API local: salud, lectura de dos tanques, setpoint/modo, demanda de frío, rechazo inválido y conflicto 409.
 - UI: revisión visual en escritorio y móvil; orden enviada desde la WebApp y confirmada por el backend.
+- Telemetría: formatos JSON, escalares, canónico e historial offline cubiertos; muestras sin tiempo verificable excluidas del control.
+- Modo degradado: con MQTT habilitado y broker inalcanzable, la API permanece saludable, reporta la desconexión y no activa simulación ni hardware.
 - Compose: configuración válida; construcción y ejecución completa pendientes de iniciar Docker Desktop.
 
 Durante el QA se corrigieron el corte de controles en anchos intermedios y el rechazo CORS de comandos cuando la WebApp usa `127.0.0.1`.

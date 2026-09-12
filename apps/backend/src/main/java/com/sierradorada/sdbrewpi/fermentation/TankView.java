@@ -12,8 +12,11 @@ public record TankView(
     String pillId,
     String pillQuality,
     Instant pillCapturedAt,
+    Instant pillReceivedAt,
     long pillAgeSeconds,
+    Integer pillBatteryPct,
+    Integer pillRssiDbm,
+    String pillSource,
     boolean coolingDemand,
     long revision
 ) {}
-
