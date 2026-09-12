@@ -1,0 +1,39 @@
+services:
+  database:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-sdbrewpi}
+      POSTGRES_USER: ${POSTGRES_USER:-sdbrewpi}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-sdbrewpi-local}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 3s
+      retries: 15
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+
+  backend:
+    build: ./apps/backend
+    environment:
+      SPRING_PROFILES_ACTIVE: postgres
+      DB_URL: jdbc:postgresql://database:5432/${POSTGRES_DB:-sdbrewpi}
+      DB_USER: ${POSTGRES_USER:-sdbrewpi}
+      DB_PASSWORD: ${POSTGRES_PASSWORD:-sdbrewpi-local}
+      HARDWARE_ENABLED: "false"
+    ports:
+      - "127.0.0.1:8081:8080"
+    depends_on:
+      database:
+        condition: service_healthy
+
+  web:
+    build: ./apps/web
+    ports:
+      - "127.0.0.1:8080:80"
+    depends_on:
+      backend:
+        condition: service_started
+
+volumes:
+  postgres-data:
