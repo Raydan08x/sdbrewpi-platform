@@ -103,7 +103,7 @@ def box(c, x, y, w, h, title, body="", fill=WHITE, stroke=NAVY,
                      body_size, body_size * 1.22, DARK, FONT)
 
 
-def page_frame(c, sheet, title, page_no, revision="A"):
+def page_frame(c, sheet, title, page_no, revision="A.1"):
     c.setStrokeColor(NAVY)
     c.setLineWidth(1.4)
     c.rect(18, 18, PW - 36, PH - 36, fill=0, stroke=1)
@@ -141,7 +141,7 @@ def page_frame(c, sheet, title, page_no, revision="A"):
     c.setFont(FONT_BOLD, 7.5)
     c.drawString(935, footer_y + 29, "HOJA")
     c.setFont(FONT, 9)
-    c.drawString(935, footer_y + 12, f"{page_no}/9")
+    c.drawString(935, footer_y + 12, f"{c.getPageNumber()}/11")
     c.setFont(FONT_BOLD, 7.5)
     c.drawString(1050, footer_y + 29, "FECHA")
     c.setFont(FONT, 9)
@@ -611,7 +611,7 @@ def references(c):
 
     headers = ["REV", "FECHA", "CAMBIO", "RESPONSABLE", "ESTADO"]
     rows = [
-        ["A", "2026-09-13", "Emision preliminar basada en fotografias, firmware y fichas oficiales", "SDBrewPi / por validar", "REVISION"],
+        ["A.1", "2026-09-13", "Emision preliminar con dos laminas fotograficas de equipos y rutas", "SDBrewPi / por validar", "REVISION"],
         ["B", "", "Datos de campo, manual VFD y calculos incorporados", "", "PENDIENTE"],
         ["C", "", "Planos de taller aprobados", "", "PENDIENTE"],
         ["AS-BUILT", "", "Cambios de obra, pruebas y parametros finales", "", "PENDIENTE"],
@@ -629,12 +629,81 @@ def references(c):
         WHITE, NAVY, body_size=10)
 
 
+def photo(c, name, x, y, w, h):
+    c.setFillColor(LIGHT_GRAY)
+    c.rect(x, y, w, h, fill=1, stroke=0)
+    c.drawImage(str(ROOT / "docs/electrical/assets" / (name + ".png")),
+                x, y, w, h, preserveAspectRatio=True, anchor="c", mask="auto")
+
+
+def photo_card(c, name, x, y, w, h, title, details, accent=BLUE):
+    box(c, x, y, w, h, title, stroke=accent, title_size=11)
+    photo(c, name, x + 8, y + 89, w - 16, h - 122)
+    draw_wrapped(c, details, x + 12, y + 73, w - 24, 10, 13)
+
+
+def photographic_overview(c):
+    page_frame(c, "E-100A", "EQUIPOS REALES DE LA PLANTA", 2)
+    photo(c, "planta", 40, 387, 685, 355)
+    box(c, 745, 387, 405, 355, "INVENTARIO FOTOGRAFICO / ALCANCE",
+        "01  T1 - Transformador PEC\nElevacion indicada: 110 a 220 V.\n\n"
+        "02  VFD1 - Power PD2000 3 32\nAlimentacion del motor trifasico.\n\n"
+        "03  CHILLER - Deposito de frio\n500 L y motor 3 HP: datos del propietario.\n\n"
+        "04  M2 - Bomba Pedrollo PKm 60\nCirculacion de agua; mando independiente.\n\n"
+        "Dos fermentadores en el alcance actual.\nHMI, placa de reles y tablero: fotografia de instalacion pendiente.",
+        LIGHT_BLUE, BLUE, body_size=12)
+    cards = [
+        ("transformador", "01 / T1 - PEC", "3 kVA / 110-220 V\nPlaca completa y tipo: pendientes.\nCapacidad frente al VFD: HOLD.", AMBER),
+        ("variador", "02 / VFD1 - POWER", "Entrada: 1 fase, 220-240 V, 23 A\nSalida: 3 fases, 0-240 V, 9.6 A\n3 HP / manual exacto pendiente.", BLUE),
+        ("chiller", "03 / CHILLER", "Deposito: 500 L (propietario)\nMotor: 3 HP, 220 V, trifasico\nPlaca del compresor pendiente.", BLUE),
+        ("bomba", "04 / M2 - PEDROLLO", "PKm 60 / 110 V / 60 Hz / 5.5 A\nP2: 0.37 kW (0.5 HP)\nP1: 550 W / IPX4", GREEN),
+    ]
+    for i, (name, title, detail, accent) in enumerate(cards):
+        photo_card(c, name, 40 + i * 280, 79, 270, 293, title, detail, accent)
+
+
+def photographic_route(c):
+    page_frame(c, "E-100B", "RUTAS DE POTENCIA Y CONTROL", 3)
+    draw_wrapped(c, "ESQUEMA FUNCIONAL PROPUESTO - flechas de energia y mando; no representan bornes ni conductores individuales.",
+                 40, 753, 1100, 11, color=RED, font=FONT_BOLD)
+    box(c, 40, 437, 190, 292, "ACOMETIDA / Q0",
+        "110 V AC segun referencia.\n\nConfirmar L/N/PE en campo.\n\nSeccionamiento, protecciones y conductores: calculo pendiente.\n\nNo adoptar los amperajes ni calibres de las imagenes de ejemplo.",
+        LIGHT_AMBER, AMBER, body_size=11)
+    photo_card(c, "transformador", 290, 437, 240, 292, "T1 / TRANSFORMADOR",
+               "PEC / 3 kVA / 110-220 V\n13.6 A ideales a 220 V.\nRevisar carga, arranque y placa.", AMBER)
+    photo_card(c, "variador", 590, 437, 240, 292, "VFD1 / VARIADOR",
+               "Entrada placa: 23 A / 1 fase\nSalida: 9.6 A / 3 fases\nParametros y RUN: ver E-102.")
+    photo_card(c, "chiller", 890, 437, 260, 292, "M1 / CHILLER",
+               "3 HP / 220 V / 3 fases*\n*Dato del propietario.\nValidar motor y uso con VFD.")
+    for a, b, label in [(230, 290, "110 V"), (530, 590, "220 V"), (830, 890, "3 fases")]:
+        arrow(c, a, 585, b, 585, RED, label=label)
+    pill(c, 320, 445, "HOLD: T1 3 kVA vs VFD 23 A", RED, 205)
+    box(c, 40, 207, 190, 207, "RAMA BOMBA / QF2",
+        "110 V AC\n\nProteccion motor + contactor KMP + rele termico.\n\nDimensionar con placa M2, arranque y tendido.",
+        LIGHT_GREEN, GREEN, body_size=11)
+    photo_card(c, "bomba", 290, 207, 240, 207, "M2 / BOMBA",
+               "110 V / 5.5 A / 0.5 HP\nKMP conmuta potencia.\nCH2 solicita marcha.", GREEN)
+    arrow(c, 230, 310, 290, 310, GREEN, label="110 V")
+    box(c, 590, 207, 260, 207, "CONTROL / BAJA TENSION",
+        "HMI Waveshare 4.3B\n     | ESP-NOW (referencia LVGL)\nESP32-S3-Relay-6CH\n\nCH1: solicitud al VFD\nCH2: solicitud a KMP\nResto de canales: ver E-102.\nFotos de placas: pendientes.",
+        LIGHT_BLUE, BLUE, body_size=11)
+    box(c, 890, 207, 260, 207, "PERMISIVOS CABLEADOS",
+        "Paro / presostatos / termicos y protecciones frigorificas segun equipo real.\n\nEl permiso fisico condiciona la marcha.\n\nReles Waveshare: circuito de mando; no motor directo.",
+        LIGHT_AMBER, AMBER, body_size=11)
+    arrow(c, 850, 310, 890, 310, BLUE)
+    box(c, 40, 79, 1110, 110, "LECTURA PARA EL TECNICO",
+        "Potencia: flechas rojas. Rama bomba: verde. Mando: azul. Los colores son categorias del esquema, no identificacion de hilos.\n"
+        "PE debe llegar a las masas que correspondan; no se representa completo en esta vista. Consultar el unifilar E-101.\n"
+        "Materiales y cantidades preliminares: E-105. Bornes e I/O: E-104. Resolver los HOLD de E-106 antes del plano de taller.",
+        WHITE, NAVY, body_size=11)
+
+
 def main():
     OUTPUT.parent.mkdir(parents=True, exist_ok=True)
     c = canvas.Canvas(str(OUTPUT), pagesize=PAGE, pageCompression=1)
     c.setTitle("SDBrewPi E-101 - Paquete electrico preliminar")
     c.setAuthor("SDBrewPi")
-    for fn in [cover, power_diagram, control_diagram, instrumentation, terminals,
+    for fn in [cover, photographic_overview, photographic_route, power_diagram, control_diagram, instrumentation, terminals,
                bom, holds, commissioning, references]:
         fn(c)
         c.showPage()

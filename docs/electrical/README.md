@@ -4,11 +4,13 @@ El paquete `SDBrewPi_E-101_Paquete_Electrico_Preliminar.pdf` traduce a planos A3
 
 ## Estado
 
-Revision A preliminar. Sirve para levantamiento, calculo y validacion por un profesional competente. No autoriza construir, cablear potencia ni energizar el chiller.
+Revision A.1 preliminar, 11 hojas A3. Sirve para levantamiento, calculo y validacion por un profesional competente. No autoriza construir, cablear potencia ni energizar el chiller.
 
 ## Contenido
 
 - E-100: portada, alcance y puntos de bloqueo.
+- E-100A: inventario fotografico con las imagenes reales del propietario.
+- E-100B: rutas funcionales de potencia y control con fotografias.
 - E-101: diagrama unifilar de fuerza.
 - E-102: mando, interlocks y salidas CH1-CH6.
 - E-103: instrumentacion y comunicaciones.
@@ -27,6 +29,8 @@ python tools/generate_electrical_package.py
 ```
 
 El PDF se escribe en `output/pdf/SDBrewPi_E-101_Paquete_Electrico_Preliminar.pdf`.
+
+Las fotografias originales del propietario usadas en las laminas se conservan en `docs/electrical/assets/`. Los ejemplos visuales no son fuente de calibres, protecciones ni cargas. Las flechas fotograficas no sustituyen un plano de bornes.
 
 ## Datos pendientes para Revision B
 
