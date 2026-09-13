@@ -44,3 +44,47 @@ export interface Overview {
     detail: string
   }
 }
+
+export interface ProfileStep {
+  order: number
+  name: string
+  targetTemperatureC: number
+  durationHours: number
+}
+
+export interface Recipe {
+  id: string
+  code: string
+  name: string
+  version: number
+  originalGravity: number
+  targetFinalGravity: number
+  defaultVolumeL: number
+  notes: string
+  createdAt: string
+  steps: ProfileStep[]
+}
+
+export interface Batch {
+  id: string
+  code: string
+  recipeVersionId: string
+  recipeCode: string
+  recipeName: string
+  recipeVersion: number
+  tankId: string
+  volumeL: number
+  status: string
+  currentStep: number
+  startedAt: string
+  expectedCompleteAt: string
+  completedAt: string | null
+  revision: number
+  profile: ProfileStep[]
+}
+
+export interface ProductionOverview {
+  generatedAt: string
+  recipes: Recipe[]
+  activeBatches: Batch[]
+}

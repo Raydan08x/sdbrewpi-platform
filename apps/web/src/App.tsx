@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Activity, AlertTriangle, BarChart3, BatteryMedium, Beer, Boxes, Building2, ChevronRight, CircleGauge, Factory, FlaskConical, Gauge, PackageSearch, Radio, RefreshCw, Signal, Snowflake, Users } from 'lucide-react'
-import { getOverview, setMode, setSetpoint } from './api'
-import type { ControlMode, Overview, Tank } from './types'
+import { Activity, AlertTriangle, BarChart3, BatteryMedium, Beer, Boxes, Building2, CalendarClock, ChevronRight, CircleGauge, Factory, FlaskConical, Gauge, ListChecks, PackageSearch, Radio, RefreshCw, Signal, Snowflake, Users } from 'lucide-react'
+import { getOverview, getProductionOverview, setMode, setSetpoint } from './api'
+import type { Batch, ControlMode, Overview, ProductionOverview, Tank } from './types'
 
 const modules = [
   { label: 'Fermentación', icon: FlaskConical, active: true },
@@ -14,7 +14,7 @@ const modules = [
   { label: 'Administración', icon: Building2 },
 ]
 
-function TankCard({ tank, busy, onMode, onSetpoint }: { tank: Tank; busy: boolean; onMode: (tank: Tank, mode: ControlMode) => void; onSetpoint: (tank: Tank, value: number) => void }) {
+function TankCard({ tank, batch, busy, onMode, onSetpoint }: { tank: Tank; batch?: Batch; busy: boolean; onMode: (tank: Tank, mode: ControlMode) => void; onSetpoint: (tank: Tank, value: number) => void }) {
   const [draft, setDraft] = useState(tank.setpointC.toFixed(1))
   const delta = tank.productTemperatureC - tank.setpointC
   const fill = Math.max(18, Math.min(92, 48 + delta * 10))
@@ -41,6 +41,10 @@ function TankCard({ tank, busy, onMode, onSetpoint }: { tank: Tank; busy: boolea
         </div>}
       </div>
     </div>
+    <div className={'batch-strip ' + (batch ? 'assigned' : 'empty')}>
+      <ListChecks size={15}/><div><small>LOTE ACTIVO</small><b>{batch?.code ?? 'Sin lote asignado'}</b></div>
+      {batch && <div className="batch-recipe"><span>{batch.recipeName} · v{batch.recipeVersion}</span><small>{batch.volumeL.toFixed(0)} L · fase {batch.currentStep}/{batch.profile.length}</small></div>}
+    </div>
     <div className="control-strip">
       <label>Objetivo °C <input type="number" min="0" max="35" step="0.1" value={draft} disabled={busy} onChange={e => setDraft(e.target.value)} /></label>
       <button disabled={busy || Number(draft) === tank.setpointC} onClick={() => onSetpoint(tank, Number(draft))}>Aplicar</button>
@@ -53,10 +57,16 @@ function TankCard({ tank, busy, onMode, onSetpoint }: { tank: Tank; busy: boolea
 
 export default function App() {
   const [overview, setOverview] = useState<Overview | null>(null)
+  const [production, setProduction] = useState<ProductionOverview | null>(null)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
   const [busy, setBusy] = useState('')
-  const load = useCallback(async () => { try { setOverview(await getOverview()); setError('') } catch (e) { setError(e instanceof Error ? e.message : 'API no disponible') } }, [])
+  const load = useCallback(async () => {
+    try {
+      const [fermentation, productionContext] = await Promise.all([getOverview(), getProductionOverview()])
+      setOverview(fermentation); setProduction(productionContext); setError('')
+    } catch (e) { setError(e instanceof Error ? e.message : 'API no disponible') }
+  }, [])
   useEffect(() => {
     const initial = window.setTimeout(load, 0)
     const interval = window.setInterval(load, 2500)
@@ -92,7 +102,15 @@ export default function App() {
           <div><span><CircleGauge size={18}/>Depósito</span><b className="muted">Sin sensor</b></div>
         </section>
         <section className="section-title"><div><span className="line"/><h3>FERMENTADORES</h3></div><small>Actualizado {new Date(overview.generatedAt).toLocaleTimeString('es-CO')}</small></section>
-        <section className="tank-grid">{overview.tanks.map(tank => <TankCard key={`${tank.id}-${tank.setpointC}`} tank={tank} busy={busy === tank.id} onMode={(t,m) => command(t.id, () => setMode(t,m))} onSetpoint={(t,v) => command(t.id, () => setSetpoint(t,v))}/>)}</section>
+        <section className="tank-grid">{overview.tanks.map(tank => <TankCard key={`${tank.id}-${tank.setpointC}`} tank={tank} batch={production?.activeBatches.find(batch => batch.tankId === tank.id)} busy={busy === tank.id} onMode={(t,m) => command(t.id, () => setMode(t,m))} onSetpoint={(t,v) => command(t.id, () => setSetpoint(t,v))}/>)}</section>
+        {production && <section className="profile-panel">
+          <div className="profile-heading"><div><span className="eyebrow">CONTEXTO DE PRODUCCIÓN</span><h3>Perfiles de fermentación</h3><p>Versiones inmutables para que cada lote conserve el proceso con el que inició.</p></div><span className="demo-badge">DATOS DE DEMOSTRACIÓN</span></div>
+          <div className="profile-grid">{production.recipes.map(recipe => <article key={recipe.id}>
+            <div className="recipe-title"><div><small>{recipe.code} · V{recipe.version}</small><b>{recipe.name}</b></div><span>{recipe.defaultVolumeL.toFixed(0)} L</span></div>
+            <div className="gravity-range"><span>OG <b>{recipe.originalGravity.toFixed(3)}</b></span><i/><span>FG <b>{recipe.targetFinalGravity.toFixed(3)}</b></span></div>
+            <ol>{recipe.steps.map(step => <li key={step.order}><span>{step.order}</span><div><b>{step.name}</b><small><CalendarClock size={12}/>{step.durationHours} h · {step.targetTemperatureC.toFixed(1)} °C</small></div></li>)}</ol>
+          </article>)}</div>
+        </section>}
         <section className="chiller-panel">
           <div className="chiller-icon"><Snowflake size={28}/></div><div><span className="eyebrow">SISTEMA COMPARTIDO</span><h3>Chiller y circulación</h3><p>La temperatura del depósito permanece inhibida hasta instalar y validar su sensor.</p></div>
           <div className="chiller-state"><span>BOMBA <b>{overview.chiller.pumpOn ? 'ENCENDIDA' : 'APAGADA'}</b></span><span>COMPRESOR <b>{overview.chiller.compressorRequest ? 'SOLICITADO' : 'SIN DEMANDA'}</b></span><span>CONTROL <b>{overview.chiller.environment}</b></span></div>

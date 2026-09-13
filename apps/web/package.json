@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
-    "lint": "eslint ."
+    "lint": "eslint .",
+    "qa:responsive": "node scripts/qa-responsive.mjs"
   },
   "dependencies": {
     "@vitejs/plugin-react": "latest",
@@ -27,4 +28,3 @@
     "vite": "latest"
   }
 }
-

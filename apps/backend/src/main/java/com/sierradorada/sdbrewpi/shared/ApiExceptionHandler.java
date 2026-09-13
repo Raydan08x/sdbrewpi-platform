@@ -32,6 +32,12 @@ public class ApiExceptionHandler {
             .body(new ApiError("REVISION_CONFLICT", exception.getMessage(), Instant.now(), Map.of()));
     }
 
+    @ExceptionHandler(IllegalStateException.class)
+    ResponseEntity<ApiError> stateConflict(IllegalStateException exception) {
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+            .body(new ApiError("STATE_CONFLICT", exception.getMessage(), Instant.now(), Map.of()));
+    }
+
     @ExceptionHandler(TankNotFoundException.class)
     ResponseEntity<ApiError> notFound(TankNotFoundException exception) {
         return ResponseEntity.status(HttpStatus.NOT_FOUND).body(new ApiError("TANK_NOT_FOUND", exception.getMessage(), Instant.now(), Map.of()));

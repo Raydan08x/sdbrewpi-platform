@@ -16,6 +16,7 @@ Abrir:
 - API: <http://localhost:8081/api/v1/fermentation/overview>
 - Salud: <http://localhost:8081/actuator/health>
 - Estado MQTT: <http://localhost:8081/api/v1/telemetry/status>
+- Producción, recetas y lotes activos: <http://localhost:8081/api/v1/production/overview>
 
 Detener con `docker compose down`. Los datos quedan en el volumen `postgres-data`.
 
@@ -49,6 +50,8 @@ $env:MQTT_PASSWORD="contraseña-local"
 ```
 
 El estado del enlace, los mensajes aceptados y rechazados aparecen en la WebApp. Los mensajes históricos y los valores retenidos sin timestamp se guardan, pero no actualizan el estado utilizado por el control.
+
+La instalación inicial incluye un perfil y un lote identificados como `DEMO`/`SIM` para probar la asociación receta–lote–fermentador. No representan producción real y pueden sustituirse desde la API cuando se definan las recetas de la cervecería.
 
 ## Alcance del producto
 
