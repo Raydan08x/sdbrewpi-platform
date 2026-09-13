@@ -46,8 +46,12 @@ public class ProductionRepository {
     }
 
     public void insertStep(String id, String recipeId, int order, ProfileStepRequest step) {
-        jdbc.update("INSERT INTO fermentation_profile_step VALUES (?, ?, ?, ?, ?, ?)", id, recipeId, order,
-            step.name().trim(), step.targetTemperatureC(), step.durationHours());
+        jdbc.update("""
+            INSERT INTO fermentation_profile_step
+                (id, recipe_version_id, step_order, name, target_temp_c, duration_hours, ramp_rate_c_per_hour)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            """, id, recipeId, order, step.name().trim(), step.targetTemperatureC(), step.durationHours(),
+            step.rampRateCPerHour());
     }
 
     public void lockTank(String tankId) {
@@ -207,7 +211,8 @@ public class ProductionRepository {
     private List<ProfileStepView> findSteps(String recipeId) {
         return jdbc.query("SELECT * FROM fermentation_profile_step WHERE recipe_version_id = ? ORDER BY step_order",
             (rs, row) -> new ProfileStepView(rs.getInt("step_order"), rs.getString("name"),
-                rs.getDouble("target_temp_c"), rs.getInt("duration_hours")), recipeId);
+                rs.getDouble("target_temp_c"), rs.getInt("duration_hours"),
+                nullableDouble(rs, "ramp_rate_c_per_hour")), recipeId);
     }
 
     private Instant nullableInstant(ResultSet rs, String column) throws SQLException {

@@ -159,6 +159,9 @@
 .profile-execution { display: grid; grid-template-columns: minmax(150px, .8fr) minmax(240px, 1.4fr) auto; gap: 18px; align-items: center; padding: 15px 17px; border: 1px solid #285064; border-radius: 10px; background: linear-gradient(135deg, #0d2434, #0a1825); }
 .profile-execution.paused { border-color: #70572b; }
 .profile-execution.completed { border-color: #285c4c; }
+.control-strip input:disabled { cursor: default; opacity: .65; }
+.profile-control-note { grid-column: 1 / -1; color: #74baca; font-size: 9px; line-height: 1.4; }
+.profile-control-note.paused { color: #dfb766; }
 .profile-execution.empty { grid-template-columns: auto 1fr; color: #658398; }
 .profile-execution.empty b, .profile-execution.empty span, .profile-state b, .profile-state small, .active-step small, .active-step b, .active-step span { display: block; }
 .profile-execution.empty b { color: #b7cbd6; font-size: 11px; }

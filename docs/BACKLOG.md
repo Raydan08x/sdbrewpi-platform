@@ -49,7 +49,8 @@
 - [x] Perfil básico por fases, temperatura y duración.
 - [ ] Editor Web de recetas y nuevas versiones.
 - [x] Ejecución temporal de fases, pausa/reanudación y cambios de setpoint.
-- [ ] Rampas térmicas configurables entre fases.
+- [x] Rampas térmicas configurables entre fases y validación de que alcancen el objetivo.
+- [x] Propiedad exclusiva del control durante la ejecución y pausa segura para intervención manual.
 - [x] Eventos básicos de perfil en el batch record.
 - [x] Bitácora de adiciones estructuradas, observaciones, mediciones manuales y eventos operativos.
 - [ ] Firma de operador ligada a autenticación y roles.

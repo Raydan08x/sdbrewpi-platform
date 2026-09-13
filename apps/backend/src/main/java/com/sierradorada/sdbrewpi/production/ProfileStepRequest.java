@@ -10,4 +10,5 @@ import jakarta.validation.constraints.Size;
 public record ProfileStepRequest(
         @NotBlank @Size(max = 80) String name,
         @DecimalMin("0.0") @DecimalMax("35.0") double targetTemperatureC,
-        @Min(1) @Max(1440) int durationHours) {}
+        @Min(1) @Max(1440) int durationHours,
+        @DecimalMin("0.10") @DecimalMax("10.00") Double rampRateCPerHour) {}

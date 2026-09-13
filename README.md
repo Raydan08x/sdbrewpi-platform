@@ -56,7 +56,7 @@ El estado del enlace, los mensajes aceptados y rechazados aparecen en la WebApp.
 
 La instalación inicial incluye un perfil y un lote identificados como `DEMO`/`SIM` para probar la asociación receta–lote–fermentador. No representan producción real y pueden sustituirse desde la API cuando se definan las recetas de la cervecería.
 
-En Producción → Fermentación, un lote puede iniciar, pausar y reanudar su perfil térmico. El motor avanza las fases por tiempo, cambia el setpoint registrado y conserva eventos de trazabilidad. En el estado actual esas acciones no se transmiten al hardware.
+En Producción → Fermentación, un lote puede iniciar, pausar y reanudar su perfil térmico. El motor avanza las fases por tiempo, aplica rampas configurables en °C/h, cambia el setpoint registrado y conserva eventos de trazabilidad. Mientras el perfil se ejecuta, bloquea órdenes manuales en conflicto; al pausarlo habilita la intervención y al reanudar recupera `AUTO` y el punto correcto de la rampa. En el estado actual esas acciones no se transmiten al hardware.
 
 ## Alcance del producto
 

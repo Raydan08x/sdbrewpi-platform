@@ -36,6 +36,7 @@ public class ProductionService {
         if (request.targetFinalGravity() >= request.originalGravity()) {
             throw new IllegalArgumentException("La densidad final objetivo debe ser menor que la densidad original");
         }
+        validateThermalRamps(request.steps());
         String code = normalizeCode(request.code());
         int version = repository.nextVersion(code);
         String id = UUID.randomUUID().toString();
@@ -106,8 +107,9 @@ public class ProductionService {
         Instant now = Instant.now();
         long elapsed = Math.max(0, Duration.between(batch.stepStartedAt(), now).toSeconds());
         if (repository.pauseProfile(id, request.expectedRevision(), elapsed) == 0) throw new RevisionConflictException();
+        fermentationRepository.holdProfileControl(batch.tankId());
         recordProfileCommand(batch, "PROFILE_PAUSED", batch.currentStep(), safeActor(actor),
-            "Perfil pausado; el objetivo térmico se mantiene", now);
+            "Perfil pausado; el tanque queda en control manual con la demanda detenida", now);
         return repository.findBatch(id).orElseThrow();
     }
 
@@ -121,7 +123,7 @@ public class ProductionService {
             throw new RevisionConflictException();
         }
         ProfileStepView step = currentStep(batch);
-        fermentationRepository.configureForProfile(batch.tankId(), step.targetTemperatureC());
+        fermentationRepository.configureForProfile(batch.tankId(), profileSetpoint(batch, step, batch.stepElapsedSeconds()));
         recordProfileCommand(batch, "PROFILE_RESUMED", step.order(), safeActor(actor),
             "Perfil reanudado en " + step.name(), now);
         return repository.findBatch(id).orElseThrow();
@@ -177,17 +179,20 @@ public class ProductionService {
             Instant transitionAt = batch.stepExpectedCompleteAt();
             int nextOrder = batch.currentStep() + 1;
             if (nextOrder > batch.profile().size()) {
+                fermentationRepository.updateProfileSetpoint(batch.tankId(), currentStep(batch).targetTemperatureC());
                 if (repository.finishProfile(batch.id(), batch.revision(), transitionAt) == 0) return;
                 repository.event(UUID.randomUUID().toString(), batch.id(), "PROFILE_COMPLETED", batch.currentStep(),
                     "profile-engine", "Perfil térmico completado; se mantiene el último objetivo", transitionAt);
             } else {
                 if (repository.advanceProfileStep(batch.id(), batch.revision(), nextOrder, transitionAt) == 0) return;
                 ProfileStepView next = batch.profile().get(nextOrder - 1);
-                fermentationRepository.configureForProfile(batch.tankId(), next.targetTemperatureC());
                 repository.event(UUID.randomUUID().toString(), batch.id(), "PROFILE_STEP_CHANGED", nextOrder,
-                    "profile-engine", "Inicio automático de " + next.name(), transitionAt);
+                    "profile-engine", stepTransitionMessage(next), transitionAt);
             }
             batch = repository.findBatch(batch.id()).orElseThrow();
+        }
+        if ("RUNNING".equals(batch.profileState())) {
+            fermentationRepository.updateProfileSetpoint(batch.tankId(), profileSetpoint(batch, currentStep(batch), now));
         }
     }
 
@@ -206,6 +211,43 @@ public class ProductionService {
     private ProfileStepView currentStep(BatchView batch) {
         int index = Math.max(0, Math.min(batch.currentStep() - 1, batch.profile().size() - 1));
         return batch.profile().get(index);
+    }
+
+    private double profileSetpoint(BatchView batch, ProfileStepView step, Instant now) {
+        long elapsedSeconds = batch.stepStartedAt() == null ? 0 : Math.max(0, Duration.between(batch.stepStartedAt(), now).toSeconds());
+        return profileSetpoint(batch, step, elapsedSeconds);
+    }
+
+    private double profileSetpoint(BatchView batch, ProfileStepView step, long elapsedSeconds) {
+        if (step.order() <= 1 || step.rampRateCPerHour() == null) return step.targetTemperatureC();
+        double start = batch.profile().get(step.order() - 2).targetTemperatureC();
+        double target = step.targetTemperatureC();
+        double maximumChange = step.rampRateCPerHour() * elapsedSeconds / 3600.0;
+        double appliedChange = Math.min(Math.abs(target - start), maximumChange);
+        double value = start + Math.copySign(appliedChange, target - start);
+        return Math.round(value * 100.0) / 100.0;
+    }
+
+    private String stepTransitionMessage(ProfileStepView step) {
+        if (step.rampRateCPerHour() == null) return "Inicio automático de " + step.name();
+        return "Inicio automático de " + step.name() + "; rampa de " + step.rampRateCPerHour() + " °C/h";
+    }
+
+    private void validateThermalRamps(List<ProfileStepRequest> steps) {
+        if (steps.getFirst().rampRateCPerHour() != null) {
+            throw new IllegalArgumentException("La primera fase no puede definir una rampa térmica");
+        }
+        for (int index = 1; index < steps.size(); index++) {
+            ProfileStepRequest previous = steps.get(index - 1);
+            ProfileStepRequest current = steps.get(index);
+            if (current.rampRateCPerHour() == null) continue;
+            double requiredChange = Math.abs(current.targetTemperatureC() - previous.targetTemperatureC());
+            double possibleChange = current.rampRateCPerHour() * current.durationHours();
+            if (possibleChange + 0.0001 < requiredChange) {
+                throw new IllegalArgumentException("La rampa de la fase " + current.name().trim()
+                    + " no alcanza su temperatura objetivo dentro de la duración configurada");
+            }
+        }
     }
 
     private void recordProfileCommand(BatchView batch, String type, Integer step, String actor, String message,

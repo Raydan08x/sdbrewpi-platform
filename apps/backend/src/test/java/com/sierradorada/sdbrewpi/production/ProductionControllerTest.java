@@ -32,6 +32,7 @@ class ProductionControllerTest {
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.recipes[0].code").value("DEMO-PALE-ALE"))
             .andExpect(jsonPath("$.recipes[0].steps.length()").value(3))
+            .andExpect(jsonPath("$.recipes[0].steps[1].rampRateCPerHour").value(0.5))
             .andExpect(jsonPath("$.activeBatches[0].code").value("SIM-LOTE-001"))
             .andExpect(jsonPath("$.activeBatches[0].tankId").value("TANK-01"))
             .andExpect(jsonPath("$.activeBatches[0].profileState").value("NOT_STARTED"))
@@ -91,6 +92,20 @@ class ProductionControllerTest {
     }
 
     @Test
+    void rejectsThermalRampThatCannotReachItsTarget() throws Exception {
+        mvc.perform(post("/api/v1/production/recipes")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {"code":"BAD-RAMP","name":"Rampa inválida","originalGravity":1.050,
+                     "targetFinalGravity":1.010,"defaultVolumeL":100,"steps":[
+                       {"name":"Principal","targetTemperatureC":20,"durationHours":24},
+                       {"name":"Cold crash","targetTemperatureC":4,"durationHours":2,"rampRateCPerHour":1}]}
+                    """))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.message").value("La rampa de la fase Cold crash no alcanza su temperatura objetivo dentro de la duración configurada"));
+    }
+
+    @Test
     void completingBatchReleasesTankForAnotherBatch() throws Exception {
         mvc.perform(put("/api/v1/production/batches/00000000-0000-0000-0000-000000000301/complete")
                 .contentType(MediaType.APPLICATION_JSON)
@@ -121,11 +136,33 @@ class ProductionControllerTest {
             .andExpect(jsonPath("$.stepStartedAt").isNotEmpty())
             .andExpect(jsonPath("$.stepExpectedCompleteAt").isNotEmpty());
 
+        mvc.perform(put("/api/v1/fermentation/tanks/TANK-01/setpoint")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"setpointC\":17.5,\"expectedRevision\":1}"))
+            .andExpect(status().isConflict())
+            .andExpect(jsonPath("$.message").value("El perfil en ejecución controla el tanque; páusalo antes de intervenir"));
+
+        mvc.perform(put("/api/v1/fermentation/tanks/TANK-01/mode")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"mode\":\"OFF\",\"expectedRevision\":1}"))
+            .andExpect(status().isConflict());
+
         mvc.perform(put("/api/v1/production/batches/" + batchId + "/profile/pause")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"expectedRevision\":1}"))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.profileState").value("PAUSED"));
+
+        mvc.perform(get("/api/v1/fermentation/overview"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.tanks[0].mode").value("MANUAL"));
+
+        Long manualRevision = jdbc.queryForObject(
+            "SELECT revision FROM fermentation_tank WHERE id = 'TANK-01'", Long.class);
+        mvc.perform(put("/api/v1/fermentation/tanks/TANK-01/setpoint")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"setpointC\":17.5,\"expectedRevision\":" + manualRevision + "}"))
+            .andExpect(status().isOk());
 
         mvc.perform(put("/api/v1/production/batches/" + batchId + "/profile/resume")
                 .contentType(MediaType.APPLICATION_JSON)
@@ -180,6 +217,7 @@ class ProductionControllerTest {
         String batchId = "00000000-0000-0000-0000-000000000301";
         jdbc.update("UPDATE production_batch SET profile_state = 'RUNNING', step_started_at = ?, revision = 1 WHERE id = ?",
             java.sql.Timestamp.from(java.time.Instant.now().minusSeconds(121 * 3600L)), batchId);
+        jdbc.update("UPDATE fermentation_tank SET mode = 'AUTO', setpoint_c = 18 WHERE id = 'TANK-01'");
 
         service.advanceProfiles();
 
@@ -188,6 +226,6 @@ class ProductionControllerTest {
             .andExpect(jsonPath("$.activeBatches[0].currentStep").value(2));
         mvc.perform(get("/api/v1/fermentation/overview"))
             .andExpect(status().isOk())
-            .andExpect(jsonPath("$.tanks[0].setpointC").value(20.0));
+            .andExpect(jsonPath("$.tanks[0].setpointC").value(18.5));
     }
 }

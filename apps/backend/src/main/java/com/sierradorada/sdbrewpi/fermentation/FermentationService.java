@@ -83,6 +83,7 @@ public class FermentationService {
     @Transactional
     public CommandResult setpoint(String id, SetpointRequest request, String actor) {
         tank(id);
+        requireManualCommandAllowed(id, null);
         if (repository.updateSetpoint(id, request.setpointC(), request.expectedRevision()) == 0) {
             throw new RevisionConflictException();
         }
@@ -93,6 +94,7 @@ public class FermentationService {
     @Transactional
     public CommandResult mode(String id, ModeRequest request, String actor) {
         tank(id);
+        requireManualCommandAllowed(id, request.mode());
         if (repository.updateMode(id, request.mode(), request.expectedRevision()) == 0) {
             throw new RevisionConflictException();
         }
@@ -113,6 +115,16 @@ public class FermentationService {
         if (actor == null || actor.isBlank()) return "local-webapp";
         String trimmed = actor.trim();
         return trimmed.length() > 80 ? trimmed.substring(0, 80) : trimmed;
+    }
+
+    private void requireManualCommandAllowed(String tankId, ControlMode requestedMode) {
+        String profileState = repository.findActiveProfileState(tankId).orElse(null);
+        if ("RUNNING".equals(profileState)) {
+            throw new IllegalStateException("El perfil en ejecución controla el tanque; páusalo antes de intervenir");
+        }
+        if ("PAUSED".equals(profileState) && requestedMode == ControlMode.AUTO) {
+            throw new IllegalStateException("Reanuda el perfil para volver al modo AUTO");
+        }
     }
 
     @Scheduled(fixedDelay = 2000)

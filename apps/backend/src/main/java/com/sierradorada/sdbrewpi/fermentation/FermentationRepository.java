@@ -37,6 +37,27 @@ public class FermentationRepository {
             """, setpointC, id);
     }
 
+    public int holdProfileControl(String id) {
+        return jdbc.update("""
+            UPDATE fermentation_tank SET mode = 'MANUAL', cooling_demand = FALSE,
+                revision = revision + 1 WHERE id = ?
+            """, id);
+    }
+
+    public int updateProfileSetpoint(String id, double setpointC) {
+        return jdbc.update("""
+            UPDATE fermentation_tank SET setpoint_c = ?, revision = revision + 1
+            WHERE id = ? AND mode = 'AUTO' AND ABS(setpoint_c - ?) >= 0.05
+            """, setpointC, id, setpointC);
+    }
+
+    public Optional<String> findActiveProfileState(String tankId) {
+        return jdbc.query("""
+            SELECT profile_state FROM production_batch
+            WHERE tank_id = ? AND status = 'ACTIVE'
+            """, (rs, row) -> rs.getString("profile_state"), tankId).stream().findFirst();
+    }
+
     public int disableProfileControl(String id) {
         return jdbc.update("""
             UPDATE fermentation_tank SET mode = 'OFF', cooling_demand = FALSE,

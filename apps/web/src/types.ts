@@ -99,6 +99,7 @@ export interface ProfileStep {
   name: string
   targetTemperatureC: number
   durationHours: number
+  rampRateCPerHour: number | null
 }
 
 export interface Recipe {
