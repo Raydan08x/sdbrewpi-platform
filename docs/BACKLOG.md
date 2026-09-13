@@ -95,3 +95,9 @@
 - Compras y proveedores.
 - Ventas, clientes y CRM.
 - Cuentas por cobrar, tesorería y adaptadores para contabilidad externa.
+
+## Incremento Web - operación de lotes de fermentación
+
+- [x] Formulario de asignación a tanque libre con versión de receta y volumen.
+- [x] Cierre explícito por código de lote, revisión optimista y tanque en OFF.
+- [ ] Consulta de lotes cerrados y acceso a su bitácora desde la WebApp.

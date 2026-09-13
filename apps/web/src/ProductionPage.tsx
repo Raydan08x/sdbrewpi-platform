@@ -1,3 +1,4 @@
+import { BatchManagement } from './BatchManagement'
 import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
 import { Activity, AlertTriangle, ArrowRight, CalendarClock, CheckCheck, CircleGauge, ClipboardList, Factory, Gauge, Layers3, ListChecks, PackageCheck, Pause, Play, Plus, Radio, RefreshCw, Scale, Signal, Snowflake } from 'lucide-react'
 import { acknowledgeAlarm, addBatchEvent, controlProfile, getAlarmHistory, getBatchEvents, getOverview, getProductionOverview, getTankHistory, setMode, setSetpoint } from './api'
@@ -209,6 +210,7 @@ export default function ProductionPage() {
       <div className="simulation-banner"><AlertTriangle size={20}/><div><b>{overview.environment === 'PLC_DEMO_READ_ONLY' ? 'PLC demo habilitado en modo de solo lectura' : overview.environment === 'LIVE_READ_ONLY' ? 'Telemetría real en modo de solo lectura' : 'Entorno de simulación'}</b><span>Ninguna salida física está habilitada.</span></div></div>
       <section className="source-grid"><div className={'telemetry-state ' + (overview.plcDemo.connected ? 'online' : overview.plcDemo.enabled ? 'waiting' : 'disabled')}><Radio size={18}/><div><b>PLC demo · {overview.plcDemo.port}</b><span>{overview.plcDemo.detail}</span></div><small>{overview.plcDemo.acceptedMessages} muestras · {overview.plcDemo.rejectedLines} rechazadas</small></div><div className={'telemetry-state ' + (overview.telemetry.connected ? 'online' : overview.telemetry.enabled ? 'waiting' : 'disabled')}><Radio size={18}/><div><b>MQTT · Pills</b><span>{overview.telemetry.detail}</span></div><small>{overview.telemetry.acceptedMessages} aceptados · {overview.telemetry.rejectedMessages} rechazados</small></div></section>
       <AlarmCenter active={overview.alarms} history={alarmHistory} busy={busy} onAcknowledge={(alarm, note) => command(`alarm:${alarm.id}`, () => acknowledgeAlarm(alarm, note), 'Alarma reconocida y registrada en la trazabilidad')}/>
+      <BatchManagement production={production} tanks={overview.tanks} onChanged={load}/>
       <ProfileExecutionPanel batches={production.activeBatches} generatedAt={overview.generatedAt} busy={busy} onAction={(batch, action) => command(batch.id, () => controlProfile(batch.id, action, batch.revision))}/>
       <BatchRecordPanel batches={production.activeBatches} events={batchEvents} busy={busy} onAdd={(batchId, values) => command(`event:${batchId}`, () => addBatchEvent(batchId, values), 'Evento agregado a la bitácora del lote')}/>
       <section className="metrics"><div><span><Activity size={18}/>Tanques activos</span><b>{overview.tanks.filter(t => t.mode !== 'OFF').length}<small>/ {overview.tanks.length}</small></b></div><div><span><Snowflake size={18}/>Demandas de frío</span><b>{overview.tanks.filter(t => t.coolingDemand).length}</b></div><div><span><Gauge size={18}/>Bomba</span><b className={overview.chiller.pumpOn ? 'cyan' : ''}>{overview.chiller.pumpOn ? 'ON' : 'OFF'}</b></div><div><span><CircleGauge size={18}/>Depósito</span><b className="muted">Sin sensor</b></div></section>
@@ -219,3 +221,4 @@ export default function ProductionPage() {
     </>}
   </main>
 }
+

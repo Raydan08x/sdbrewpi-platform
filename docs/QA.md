@@ -45,3 +45,10 @@ docker compose down
 - Compose: configuración válida; construcción y ejecución completa pendientes de iniciar Docker Desktop.
 
 Durante el QA se corrigieron el corte de controles en anchos intermedios y el rechazo CORS de comandos cuando la WebApp usa `127.0.0.1`.
+
+## Avance WebApp - gestión de lotes de fermentación
+
+- La pantalla permite asignar código, versión de receta, tanque libre y volumen mediante la API existente.
+- Crear el lote no inicia el perfil. El cierre exige escribir el código y utiliza la revisión del lote seleccionado; el backend deja el tanque en OFF.
+- QA: 44 pruebas backend aprobadas, lint y build correctos; formularios y confirmación revisados a 390/1440 px. No se ejecutó un alta/cierre desde el navegador sobre los lotes persistentes del propietario; los endpoints se verificaron en las pruebas de integración H2.
+- Sin modificaciones ni comandos al firmware, puertos COM o carpeta LVGL.

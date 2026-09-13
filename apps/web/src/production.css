@@ -215,3 +215,15 @@
   .batch-record form { border-right: 0; border-bottom: 1px solid #203e50; }
   .event-form-row, .event-form-row.addition { grid-template-columns: 1fr; }
 }
+.batch-management { margin: 20px 0; padding: 22px; border: 1px solid #304156; border-radius: 12px; background: #152131; }
+.batch-management p { color: #b6c4d4; line-height: 1.6; }
+.batch-management-heading, .batch-management-list > div, .batch-buttons { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.batch-management button { padding: 10px 14px; border: 1px solid #3e6178; border-radius: 7px; background: #203b50; color: #edf7ff; cursor: pointer; }
+.batch-management button:disabled { opacity: .5; cursor: not-allowed; }
+.batch-create-fields { border: 1px solid #42536a; border-radius: 8px; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; padding: 18px; margin: 16px 0; min-width: 0; }
+.batch-management label { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.batch-management input, .batch-management select { width: 100%; min-width: 0; box-sizing: border-box; padding: 10px; border: 1px solid #496078; border-radius: 6px; background: #101c2a; color: #eef5ff; }
+.batch-management-list > div { border-top: 1px solid #304156; padding: 12px 0; overflow-wrap: anywhere; }
+.batch-close-confirm { border: 1px solid #c68c36; padding: 16px; border-radius: 8px; margin-top: 12px; }
+.batch-close-confirm .batch-buttons { margin-top: 12px; }
+@media (max-width: 600px) { .batch-create-fields { grid-template-columns: minmax(0, 1fr); } .batch-management { padding: 14px; } }

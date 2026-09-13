@@ -1,5 +1,5 @@
 import { existsSync } from 'node:fs'
-import { mkdtemp, rm } from 'node:fs/promises'
+import { mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join, resolve } from 'node:path'
 import { spawn } from 'node:child_process'
@@ -112,7 +112,33 @@ try {
   })
   await delay(1200)
   const fermentation = await inspectLayout('Fermentación')
-  const results = [plant, warehouseEditor, production, fermentation]
+  await send('Runtime.evaluate', { expression: `document.querySelector('.batch-management-heading button').click()` })
+  await delay(200)
+  const batchEditor = await inspectLayout('Asignación de lote')
+  const check = await send('Runtime.evaluate', { returnByValue: true, expression: `(() => {
+    const form = document.querySelector('.batch-management form');
+    if (!form || form.checkValidity()) throw new Error('El formulario vacío debe ser inválido');
+    document.querySelector('.batch-management-list button').click();
+    return true;
+  })()` })
+  if (check.exceptionDetails) throw new Error('Falló validación de formulario de lote')
+  await delay(200)
+  const closeEditor = await inspectLayout('Confirmación de cierre')
+  const guard = await send('Runtime.evaluate', { returnByValue: true, expression: `(() => {
+    const button = document.querySelector('.batch-close-confirm button');
+    if (!button || !button.disabled) throw new Error('Cierre habilitado sin confirmación');
+    document.querySelectorAll('.batch-close-confirm button')[1].click();
+    return true;
+  })()` })
+  if (guard.exceptionDetails) throw new Error('Falló protección del cierre de lote')
+  await send('Emulation.setDeviceMetricsOverride', {width: 1440, height: 1000, deviceScaleFactor: 1, mobile: false})
+  await delay(200)
+  const desktop = await inspectLayout('Fermentación escritorio')
+  if (process.env.QA_SCREENSHOT) {
+    const capture = await send('Page.captureScreenshot', {format: 'png', captureBeyondViewport: false})
+    await writeFile(process.env.QA_SCREENSHOT, Buffer.from(capture.data, 'base64'))
+  }
+  const results = [plant, warehouseEditor, production, fermentation, batchEditor, closeEditor, desktop]
   console.log(JSON.stringify(results, null, 2))
   socket.close()
   if (results.some(result => result.documentWidth > result.viewportWidth || result.offenders.length > 0)) process.exitCode = 1
