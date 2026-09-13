@@ -1,17 +1,18 @@
 import { useCallback, useEffect, useState } from 'react'
-import { Activity, AlertTriangle, BarChart3, BatteryMedium, Beer, Boxes, Building2, CalendarClock, ChevronRight, CircleGauge, Factory, FlaskConical, Gauge, ListChecks, PackageSearch, Radio, RefreshCw, Signal, Snowflake, Users } from 'lucide-react'
+import { Activity, AlertTriangle, BarChart3, BatteryMedium, Beer, Boxes, Building2, CalendarClock, ChevronRight, CircleDollarSign, CircleGauge, Factory, Gauge, ListChecks, PackageSearch, Radio, RefreshCw, Signal, Snowflake, Users } from 'lucide-react'
 import { getOverview, getProductionOverview, setMode, setSetpoint } from './api'
 import type { Batch, ControlMode, Overview, ProductionOverview, Tank } from './types'
+import PlantPage from './PlantPage'
 
 const modules = [
-  { label: 'Fermentación', icon: FlaskConical, active: true },
-  { label: 'Producción', icon: Factory },
-  { label: 'Recetas', icon: Beer },
-  { label: 'Inventarios', icon: Boxes },
-  { label: 'Planeación MRP', icon: BarChart3 },
-  { label: 'Compras', icon: PackageSearch },
-  { label: 'Clientes CRM', icon: Users },
-  { label: 'Administración', icon: Building2 },
+  { id: 'plant', label: 'Mi Planta', icon: Building2, implemented: true },
+  { id: 'inventory', label: 'Inventarios', icon: Boxes, implemented: false },
+  { id: 'recipes', label: 'Recetas', icon: Beer, implemented: false },
+  { id: 'mrp', label: 'Planeación MRP', icon: BarChart3, implemented: false },
+  { id: 'production', label: 'Producción', icon: Factory, implemented: true },
+  { id: 'purchasing', label: 'Compras', icon: PackageSearch, implemented: false },
+  { id: 'crm', label: 'Ventas y CRM', icon: Users, implemented: false },
+  { id: 'finance', label: 'Finanzas', icon: CircleDollarSign, implemented: false },
 ]
 
 function TankCard({ tank, batch, busy, onMode, onSetpoint }: { tank: Tank; batch?: Batch; busy: boolean; onMode: (tank: Tank, mode: ControlMode) => void; onSetpoint: (tank: Tank, value: number) => void }) {
@@ -56,6 +57,7 @@ function TankCard({ tank, batch, busy, onMode, onSetpoint }: { tank: Tank; batch
 }
 
 export default function App() {
+  const [page, setPage] = useState<'plant' | 'production'>('plant')
   const [overview, setOverview] = useState<Overview | null>(null)
   const [production, setProduction] = useState<ProductionOverview | null>(null)
   const [error, setError] = useState('')
@@ -68,10 +70,11 @@ export default function App() {
     } catch (e) { setError(e instanceof Error ? e.message : 'API no disponible') }
   }, [])
   useEffect(() => {
+    if (page !== 'production') return
     const initial = window.setTimeout(load, 0)
     const interval = window.setInterval(load, 2500)
     return () => { window.clearTimeout(initial); window.clearInterval(interval) }
-  }, [load])
+  }, [load, page])
 
   const command = async (id: string, action: () => Promise<unknown>) => {
     setBusy(id); setNotice('');
@@ -83,9 +86,10 @@ export default function App() {
   return <div className="app-shell">
     <aside>
       <div className="brand"><div className="brand-mark"><Beer size={24}/></div><div><b>SDBrewPi</b><span>BREWERY OS</span></div></div>
-      <nav>{modules.map(({label,icon:Icon,active}) => <button key={label} className={active ? 'active' : ''} disabled={!active}><Icon size={19}/><span>{label}</span>{active ? <ChevronRight size={16}/> : <small>Próximamente</small>}</button>)}</nav>
+      <nav>{modules.map(({id,label,icon:Icon,implemented}) => <button key={id} className={`${page === id ? 'active ' : ''}${implemented ? 'implemented' : ''}`} disabled={!implemented} onClick={() => { if (id === 'plant' || id === 'production') setPage(id) }}><Icon size={19}/><span>{label}</span>{page === id ? <ChevronRight size={16}/> : !implemented ? <small>Próximamente</small> : null}</button>)}</nav>
       <div className="system-card"><span className="live-dot"/>Sistema local<b>Modo simulación</b><small>Hardware bloqueado</small></div>
     </aside>
+    {page === 'plant' ? <PlantPage/> :
     <main>
       <header><div><span className="eyebrow">CONTROL DE PROCESO</span><h1>Fermentación</h1><p>Dos tanques · circuito de frío compartido</p></div><button className="refresh" onClick={load}><RefreshCw size={17}/> Actualizar</button></header>
       <div className="simulation-banner"><AlertTriangle size={20}/><div><b>{overview?.environment === 'LIVE_READ_ONLY' ? 'Telemetría real en modo de solo lectura' : 'Entorno de simulación'}</b><span>Ninguna salida física está habilitada.</span></div></div>
@@ -117,5 +121,6 @@ export default function App() {
         </section>
       </>}
     </main>
+    }
   </div>
 }

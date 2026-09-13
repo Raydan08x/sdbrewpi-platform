@@ -1,4 +1,4 @@
-import type { ControlMode, Overview, ProductionOverview, Tank } from './types'
+import type { ControlMode, Overview, PlantOverview, PlantProfile, ProductionOverview, Tank } from './types'
 
 async function request<T>(url: string, init?: RequestInit): Promise<T> {
   const response = await fetch(url, { ...init, headers: { 'Content-Type': 'application/json', 'X-Actor': 'local-webapp', ...init?.headers } })
@@ -15,6 +15,12 @@ async function request<T>(url: string, init?: RequestInit): Promise<T> {
 
 export const getOverview = () => request<Overview>('/api/v1/fermentation/overview')
 export const getProductionOverview = () => request<ProductionOverview>('/api/v1/production/overview')
+export const getPlantOverview = () => request<PlantOverview>('/api/v1/plant/overview')
+
+export const updatePlantProfile = (site: PlantProfile, values: Omit<PlantProfile, 'id' | 'code' | 'revision' | 'updatedAt'>) =>
+  request<PlantProfile>('/api/v1/plant/sites/' + site.id, {
+    method: 'PUT', body: JSON.stringify({ ...values, expectedRevision: site.revision })
+  })
 
 export const setMode = (tank: Tank, mode: ControlMode) => request('/api/v1/fermentation/tanks/' + tank.id + '/mode', {
   method: 'PUT', body: JSON.stringify({ mode, expectedRevision: tank.revision })

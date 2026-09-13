@@ -9,6 +9,28 @@
 - [x] Bitácora de comandos.
 - [x] Dashboard adaptable.
 - [x] Adaptador MQTT de solo lectura para los repetidores actuales.
+- [x] Mi Planta como módulo inicial y registro de la sede/equipos conocidos.
+- [x] Configuración editable de identidad, capacidad, fermentadores previstos y remanente de tubería.
+
+## Orden del producto
+
+- [x] Mi Planta.
+- [ ] Inventarios.
+- [ ] Recetas.
+- [ ] Planeación MRP.
+- [x] Producción, con Fermentación como proceso inicial.
+- [ ] Compras.
+- [ ] Ventas y CRM.
+- [ ] Finanzas e integración contable externa.
+
+## M0.5 — Completar Mi Planta
+
+- [ ] Editor de equipos, sensores, capacidades y conexiones.
+- [ ] Modelo de circuitos, tramos y remanentes de tubería.
+- [ ] Bodegas y ubicaciones físicas de la sede.
+- [ ] Agente local para descubrir controladores compatibles por USB.
+- [ ] Catálogo firmado de firmware por familia y revisión de hardware.
+- [ ] Flujo de respaldo, instalación, autoprueba y registro sin habilitar salidas.
 
 ## M1 — Telemetría real, todavía sin actuación
 
@@ -49,9 +71,10 @@
 
 ## Expansión empresarial
 
-- Formulación y recetas.
-- Producción y planificación MRP.
-- Inventarios, compras y proveedores.
+- Catálogo de artículos y bodegas para materias primas, empaque, insumos, producto en proceso, producto terminado y repuestos.
+- Formulación y recetas ligadas al catálogo.
+- Planeación MRP basada en inventario, recetas, demanda y capacidad.
+- Producción, consumos, mermas, calidad, mantenimiento y costos.
+- Compras y proveedores.
 - Ventas, clientes y CRM.
-- Cuentas de cobro, tesorería y contabilidad.
-- Mantenimiento, calidad, costos y reportes.
+- Cuentas por cobrar, tesorería y adaptadores para contabilidad externa.

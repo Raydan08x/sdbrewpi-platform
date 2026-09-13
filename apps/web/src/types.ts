@@ -88,3 +88,54 @@ export interface ProductionOverview {
   recipes: Recipe[]
   activeBatches: Batch[]
 }
+
+export interface PlantProfile {
+  id: string
+  code: string
+  name: string
+  companyName: string
+  legalName: string
+  taxId: string
+  timezone: string
+  currency: string
+  nominalBatchCapacityL: number | null
+  plannedFermenters: number
+  pipingDeadVolumeL: number
+  logoUrl: string
+  revision: number
+  updatedAt: string
+}
+
+export interface PlantAsset {
+  id: string
+  siteId: string
+  code: string
+  assetType: string
+  name: string
+  manufacturer: string
+  model: string
+  capacityL: number | null
+  electricalSpec: string
+  communicationProtocol: string
+  deviceIdentifier: string
+  firmwareProfile: string
+  status: string
+  controllable: boolean
+  notes: string
+  revision: number
+}
+
+export interface PlantOverview {
+  generatedAt: string
+  site: PlantProfile
+  assets: PlantAsset[]
+  onboarding: {
+    status: string
+    scannerEnabled: boolean
+    hardwareOutputsEnabled: boolean
+    detail: string
+    supportedFirmwareProfiles: string[]
+    requiredSteps: string[]
+  }
+  assetsNeedingData: number
+}

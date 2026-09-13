@@ -1,0 +1,11 @@
+package com.sierradorada.sdbrewpi.plant;
+
+import java.time.Instant;
+import java.util.List;
+
+public record PlantOverview(
+        Instant generatedAt,
+        PlantProfileView site,
+        List<PlantAssetView> assets,
+        DeviceOnboardingView onboarding,
+        int assetsNeedingData) {}

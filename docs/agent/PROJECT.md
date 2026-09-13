@@ -12,7 +12,12 @@ SDBrewPi Platform es una WebApp modular para gestionar una cervecería artesanal
 ## Reglas de arquitectura
 
 - El backend empresarial guarda recetas, lotes, perfiles, usuarios y auditoría.
-- El controlador de campo será la autoridad final sobre actuadores e interlocks.
+- El controlador de campo conserva los interlocks y el estado seguro aunque el servidor no esté disponible.
 - La WebApp expresa intenciones y muestra confirmaciones.
 - El modo simulado debe ser inequívoco en API y UI.
 
+## Orden funcional acordado
+
+Mi Planta → Inventarios → Recetas → Planeación MRP → Producción → Compras → Ventas y CRM → Finanzas.
+
+Mi Planta es la raíz de configuración reutilizable por sede: identidad, capacidades, equipos, sensores, tuberías, bodegas y preparación de firmware. Fermentación es un proceso del módulo Producción. La contabilidad fiscal se delegará a un proveedor externo mediante adaptadores.

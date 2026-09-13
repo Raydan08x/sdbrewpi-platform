@@ -17,6 +17,7 @@ Abrir:
 - Salud: <http://localhost:8081/actuator/health>
 - Estado MQTT: <http://localhost:8081/api/v1/telemetry/status>
 - Producción, recetas y lotes activos: <http://localhost:8081/api/v1/production/overview>
+- Mi Planta, equipos y preparación de dispositivos: <http://localhost:8081/api/v1/plant/overview>
 
 Detener con `docker compose down`. Los datos quedan en el volumen `postgres-data`.
 
@@ -55,4 +56,6 @@ La instalación inicial incluye un perfil y un lote identificados como `DEMO`/`S
 
 ## Alcance del producto
 
-La arquitectura es un monolito modular. Fermentación es el primer módulo; recetas, producción, inventario, compras, ventas, CRM y contabilidad comparten identidad y datos maestros, pero conservan límites de dominio.
+La arquitectura es un monolito modular. El orden funcional es Mi Planta, Inventarios, Recetas, Planeación MRP, Producción, Compras, Ventas y CRM, y Finanzas. Fermentación pertenece a Producción. La contabilidad fiscal se conectará mediante adaptadores a un servicio externo.
+
+El alcance y los límites de cada módulo están en [docs/PRODUCT-MAP.md](docs/PRODUCT-MAP.md).

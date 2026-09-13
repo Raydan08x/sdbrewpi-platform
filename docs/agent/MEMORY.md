@@ -9,6 +9,9 @@
 - Pruebas en PC y simulación antes de conectar hardware.
 - MQTT se integra primero en modo de solo lectura; `hardware.enabled=false` permanece obligatorio.
 - Los tópicos retenidos sin timestamp y `/history` nunca alimentan el control actual.
+- El orden funcional acordado es Mi Planta, Inventarios, Recetas, Planeación MRP, Producción, Compras, Ventas y CRM, y Finanzas.
+- Fermentación pertenece a Producción. Inventarios antecede a Recetas para aportar artículos, unidades, lotes y costos.
+- SDBrewPi conservará la operación y el costo industrial; la contabilidad fiscal se integrará por adaptadores con Alegra o Siigo, todavía sin proveedor elegido.
 
 ## Hardware identificado
 
@@ -28,3 +31,4 @@
 - El broker documentado en la red anterior no fue alcanzable desde la PC durante el QA del 2026-09-12.
 - Los repetidores y Pills están temporalmente fuera de servicio por batería; continuar QA con simulación hasta aviso del propietario.
 - Producción contiene recetas versionadas, fases y lotes activos. `DEMO-PALE-ALE` y `SIM-LOTE-001` son datos exclusivos de simulación.
+- Mi Planta es la pantalla inicial y registra una sede y 13 activos conocidos. El escáner USB y la instalación de firmware están especificados pero deshabilitados.
