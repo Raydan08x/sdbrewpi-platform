@@ -34,12 +34,23 @@ public class TelemetryRepository {
     public int updateCurrentTank(PillTelemetrySample sample) {
         return jdbc.update("""
             UPDATE fermentation_tank
-            SET product_temp_c = ?, gravity = ?, pill_battery_pct = ?, pill_rssi_dbm = ?, pill_captured_at = ?,
+            SET product_temp_c = COALESCE(?, product_temp_c), gravity = COALESCE(?, gravity),
+                pill_battery_pct = COALESCE(?, pill_battery_pct), pill_rssi_dbm = COALESCE(?, pill_rssi_dbm), pill_captured_at = ?,
                 pill_received_at = ?, pill_quality = ?, pill_source = ?
             WHERE pill_id = ? AND pill_captured_at <= ?
             """, sample.temperatureC(), sample.gravity(), sample.batteryPct(), sample.rssiDbm(),
             Timestamp.from(sample.capturedAt()), Timestamp.from(sample.receivedAt()), sample.quality(), sample.sourceFormat(),
             sample.pillId(), Timestamp.from(sample.capturedAt()));
+    }
+
+    public int recordMeasurement(PillTelemetrySample sample) {
+        if (sample.temperatureC() == null && sample.gravity() == null) return 0;
+        return jdbc.update("""
+            INSERT INTO fermentation_measurement
+                (tank_id, source, captured_at, received_at, temperature_c, gravity, quality)
+            SELECT id, ?, ?, ?, ?, ?, ? FROM fermentation_tank WHERE pill_id = ?
+            """, sample.sourceFormat(), Timestamp.from(sample.capturedAt()), Timestamp.from(sample.receivedAt()),
+            sample.temperatureC(), sample.gravity(), sample.quality(), sample.pillId());
     }
 
     public void reject(String topic, String reason, Instant receivedAt) {

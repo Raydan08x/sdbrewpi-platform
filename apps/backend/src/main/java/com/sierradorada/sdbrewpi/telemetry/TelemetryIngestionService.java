@@ -27,6 +27,7 @@ public class TelemetryIngestionService {
             PillTelemetrySample sample = parser.parse(topic, payload, retained, receivedAt);
             boolean inserted = repository.insert(sample);
             if (!inserted) return new TelemetryIngestionResult(false, true, false, "Mensaje duplicado");
+            repository.recordMeasurement(sample);
             boolean eligible = sample.eligibleForLiveState(receivedAt, Duration.ofSeconds(properties.freshnessSeconds()));
             boolean updated = eligible && repository.updateCurrentTank(sample) > 0;
             status.accepted(receivedAt);

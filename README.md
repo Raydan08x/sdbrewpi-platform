@@ -40,6 +40,8 @@ npm run dev -- --host 127.0.0.1
 
 `SIMULATION` está habilitado por defecto. La aplicación no acciona GPIO, relés ni Modbus. El modo `LIVE_READ_ONLY` permite consumir las Pills sin habilitar ninguna salida física.
 
+La demo de la pantalla/PLC puede leerse por USB serie con `PLC_DEMO_ENABLED=true`, `PLC_DEMO_PORT=COM5` y `SIMULATION_ENABLED=false`. El conector acepta las variantes observadas con estados `Chiller/Bomba` o con `Delta`, guarda curvas y alarmas, y no contiene operaciones de escritura. Se mantiene deshabilitado por defecto para no bloquear el puerto mientras se desarrolla el firmware.
+
 Para la prueba MQTT, configura las variables en una terminal o en un archivo `.env` local que Git ignora:
 
 ```powershell
@@ -53,6 +55,8 @@ $env:MQTT_PASSWORD="contraseña-local"
 El estado del enlace, los mensajes aceptados y rechazados aparecen en la WebApp. Los mensajes históricos y los valores retenidos sin timestamp se guardan, pero no actualizan el estado utilizado por el control.
 
 La instalación inicial incluye un perfil y un lote identificados como `DEMO`/`SIM` para probar la asociación receta–lote–fermentador. No representan producción real y pueden sustituirse desde la API cuando se definan las recetas de la cervecería.
+
+En Producción → Fermentación, un lote puede iniciar, pausar y reanudar su perfil térmico. El motor avanza las fases por tiempo, cambia el setpoint registrado y conserva eventos de trazabilidad. En el estado actual esas acciones no se transmiten al hardware.
 
 ## Alcance del producto
 

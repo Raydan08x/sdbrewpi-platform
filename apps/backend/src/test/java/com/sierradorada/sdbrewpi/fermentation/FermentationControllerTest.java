@@ -26,7 +26,18 @@ class FermentationControllerTest {
             .andExpect(jsonPath("$.environment").value("SIMULATION"))
             .andExpect(jsonPath("$.tanks.length()").value(2))
             .andExpect(jsonPath("$.telemetry.enabled").value(false))
+            .andExpect(jsonPath("$.plcDemo.enabled").value(false))
+            .andExpect(jsonPath("$.alarms").isArray())
             .andExpect(jsonPath("$.chiller.hardwareEnabled").value(false));
+    }
+
+    @Test
+    void exposesBoundedTankHistory() throws Exception {
+        mvc.perform(get("/api/v1/fermentation/tanks/TANK-01/history")
+                .param("hours", "99999").param("limit", "99999"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.tankId").value("TANK-01"))
+            .andExpect(jsonPath("$.samples").isArray());
     }
 
     @Test

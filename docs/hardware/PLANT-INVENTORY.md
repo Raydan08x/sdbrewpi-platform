@@ -15,6 +15,15 @@ Fecha de revisión: 2026-09-12. Fuente: fotografías suministradas por el propie
 
 La [ficha oficial de Pedrollo](https://www.pedrollo.com/wp-content/uploads/schede-tecniche/ES/PKm-60_ES-ficha-tecnica_60Hz.pdf) confirma para la PKm 60 de 60 Hz un caudal máximo de 40 L/min, altura máxima de 40 m y consumo de 5,5 A en la versión monofásica de 110 V.
 
+## Controladores USB observados
+
+| Puerto | Equipo confirmado | Uso autorizado actualmente |
+|---|---|---|
+| COM3 | Módulo Waveshare de seis relés y buzzer | Observación únicamente; firmware en desarrollo por el propietario |
+| COM5 | Pantalla/PLC Waveshare con demo de F1/F2 | Lectura serie opcional; sin comandos ni cambios de firmware |
+
+La demo de COM5 alterna líneas con `Chiller/Bomba` y líneas con `Delta`. El backend acepta ambas variantes sin suponer estados cuando no vienen informados. Los puertos deben permanecer libres fuera de una prueba solicitada para no interferir con las cargas del propietario.
+
 ## Fermentación y proceso
 
 - La planta fotografiada incluye dos fermentadores cónicos que serán el alcance inicial del control de frío.

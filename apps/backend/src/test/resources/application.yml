@@ -10,6 +10,12 @@ sdbrewpi:
     enabled: false
   simulation:
     enabled: false
+  plc-demo:
+    enabled: false
+    port: COM5
+    baud-rate: 115200
+    freshness-seconds: 10
+    history-interval-seconds: 1
   mqtt:
     enabled: false
     freshness-seconds: 90

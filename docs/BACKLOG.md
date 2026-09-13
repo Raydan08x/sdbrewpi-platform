@@ -40,16 +40,18 @@
 - [x] Estado `STALE` para lecturas atrasadas y estado de conexión MQTT.
 - [ ] Actualizar los repetidores para publicar una muestra atómica con `capturedAt`, `messageId` y `sequence`.
 - [x] Asociación segura con lote activo y bloqueo de doble asignación por fermentador.
-- [ ] Alarmas persistentes de batería y pérdida de repetidor.
-- [ ] Curvas de temperatura y gravedad.
+- [x] Alarmas persistentes de batería, pérdida de fuente y banderas de la demo PLC.
+- [x] Curvas unificadas de temperatura y gravedad para simulación, MQTT y demo PLC.
 
 ## M2 — Perfiles y trazabilidad
 
 - [x] Base de recetas versionadas y snapshot de identidad por lote.
 - [x] Perfil básico por fases, temperatura y duración.
 - [ ] Editor Web de recetas y nuevas versiones.
-- [ ] Ejecución temporal de fases, rampas y cambios de setpoint.
-- Batch record, eventos y adiciones.
+- [x] Ejecución temporal de fases, pausa/reanudación y cambios de setpoint.
+- [ ] Rampas térmicas configurables entre fases.
+- [x] Eventos básicos de perfil en el batch record.
+- [ ] Registro de adiciones, observaciones, mediciones manuales y firmas.
 - Simulación determinista de fallos y recuperación.
 
 ## M2.5 — Ejecución integral de producción
@@ -67,6 +69,7 @@
 
 - [x] Registrar placas y separación eléctrica del chiller, variador, transformador y bomba.
 - [ ] Identificar completamente PLC, módulo de relés y sensores.
+- [x] Adaptador serie de solo lectura para la demo del HMI/PLC en COM5, deshabilitado por defecto.
 - Confirmar modelos, diagramas eléctricos, niveles de señal y protocolos del PLC, relés y variador.
 - Firmware de HMI principal y auxiliar.
 - Firmware/controlador con watchdog y estado seguro.

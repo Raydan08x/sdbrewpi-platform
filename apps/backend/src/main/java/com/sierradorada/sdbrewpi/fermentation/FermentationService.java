@@ -4,7 +4,11 @@ import com.sierradorada.sdbrewpi.shared.TankNotFoundException;
 import com.sierradorada.sdbrewpi.shared.RevisionConflictException;
 import com.sierradorada.sdbrewpi.telemetry.MqttProperties;
 import com.sierradorada.sdbrewpi.telemetry.TelemetryRuntimeStatus;
+import com.sierradorada.sdbrewpi.plc.PlcDemoProperties;
+import com.sierradorada.sdbrewpi.plc.PlcDemoRuntimeStatus;
+import java.time.Duration;
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -19,21 +23,37 @@ public class FermentationService {
     private final boolean simulationEnabled;
     private final MqttProperties mqttProperties;
     private final TelemetryRuntimeStatus telemetryStatus;
+    private final PlcDemoProperties plcProperties;
+    private final PlcDemoRuntimeStatus plcStatus;
 
     public FermentationService(FermentationRepository repository,
             @Value("${sdbrewpi.hardware.enabled:false}") boolean hardwareEnabled,
             @Value("${sdbrewpi.simulation.enabled:true}") boolean simulationEnabled,
-            MqttProperties mqttProperties, TelemetryRuntimeStatus telemetryStatus) {
+            MqttProperties mqttProperties, TelemetryRuntimeStatus telemetryStatus,
+            PlcDemoProperties plcProperties, PlcDemoRuntimeStatus plcStatus) {
         this.repository = repository;
         this.hardwareEnabled = hardwareEnabled;
         this.simulationEnabled = simulationEnabled;
         this.mqttProperties = mqttProperties;
         this.telemetryStatus = telemetryStatus;
+        this.plcProperties = plcProperties;
+        this.plcStatus = plcStatus;
     }
 
     public FermentationOverview overview() {
-        String environment = hardwareEnabled ? "HARDWARE" : mqttProperties.enabled() ? "LIVE_READ_ONLY" : "SIMULATION";
-        return new FermentationOverview(environment, Instant.now(), repository.findTanks(), repository.findChiller(hardwareEnabled), telemetryStatus.view());
+        String environment = hardwareEnabled ? "HARDWARE" : plcProperties.enabled() ? "PLC_DEMO_READ_ONLY"
+            : mqttProperties.enabled() ? "LIVE_READ_ONLY" : "SIMULATION";
+        return new FermentationOverview(environment, Instant.now(), repository.findTanks(), repository.findChiller(hardwareEnabled),
+            telemetryStatus.view(), plcStatus.view(), repository.findActiveAlarms());
+    }
+
+    public FermentationHistoryView history(String id, int hours, int limit) {
+        tank(id);
+        int safeHours = Math.max(1, Math.min(hours, 24 * 30));
+        int safeLimit = Math.max(1, Math.min(limit, 2000));
+        Instant from = Instant.now().minus(Duration.ofHours(safeHours));
+        List<FermentationMeasurementView> samples = repository.findHistory(id, from, safeLimit);
+        return new FermentationHistoryView(id, from, Instant.now(), samples.reversed());
     }
 
     @Transactional
@@ -42,7 +62,8 @@ public class FermentationService {
         if (repository.updateSetpoint(id, request.setpointC(), request.expectedRevision()) == 0) {
             throw new RevisionConflictException();
         }
-        return accepted(actor, id, "SET_SETPOINT", Double.toString(request.setpointC()), "Setpoint actualizado en entorno simulado");
+        return accepted(actor, id, "SET_SETPOINT", Double.toString(request.setpointC()),
+            "Setpoint guardado; las salidas físicas están deshabilitadas");
     }
 
     @Transactional
@@ -73,7 +94,7 @@ public class FermentationService {
     @Scheduled(fixedDelay = 2000)
     @Transactional
     public void simulate() {
-        if (!simulationEnabled || hardwareEnabled || mqttProperties.enabled()) return;
+        if (!simulationEnabled || hardwareEnabled || mqttProperties.enabled() || plcProperties.enabled()) return;
         boolean anyDemand = false;
         Instant now = Instant.now();
         for (TankView tank : repository.findTanks()) {
@@ -83,6 +104,8 @@ public class FermentationService {
             double temperature = clamp(tank.productTemperatureC() + ambientEffect + coolingEffect, 0, 35);
             double gravity = Math.max(0.998, tank.gravity() - 0.00002);
             repository.simulate(tank.id(), temperature, gravity, demand, now);
+            repository.recordMeasurementIfDue(tank.id(), "SIMULATION", now, temperature, gravity, "GOOD",
+                now.minusSeconds(10));
             anyDemand |= demand;
         }
         repository.simulateChiller(anyDemand);

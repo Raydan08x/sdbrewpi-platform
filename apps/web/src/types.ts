@@ -43,6 +43,45 @@ export interface Overview {
     rejectedMessages: number
     detail: string
   }
+  plcDemo: {
+    enabled: boolean
+    connected: boolean
+    port: string
+    lastMessageAt: string | null
+    acceptedMessages: number
+    rejectedLines: number
+    detail: string
+  }
+  alarms: FermentationAlarm[]
+}
+
+export interface FermentationAlarm {
+  id: string
+  targetId: string
+  code: string
+  severity: string
+  status: string
+  message: string
+  source: string
+  openedAt: string
+  lastSeenAt: string
+  clearedAt: string | null
+}
+
+export interface FermentationMeasurement {
+  capturedAt: string
+  receivedAt: string
+  temperatureC: number | null
+  gravity: number | null
+  quality: string
+  source: string
+}
+
+export interface FermentationHistory {
+  tankId: string
+  from: string
+  generatedAt: string
+  samples: FermentationMeasurement[]
 }
 
 export interface ProfileStep {
@@ -76,6 +115,11 @@ export interface Batch {
   volumeL: number
   status: string
   currentStep: number
+  profileState: 'NOT_STARTED' | 'RUNNING' | 'PAUSED' | 'COMPLETED'
+  stepStartedAt: string | null
+  stepExpectedCompleteAt: string | null
+  stepElapsedSeconds: number
+  profileCompletedAt: string | null
   startedAt: string
   expectedCompleteAt: string
   completedAt: string | null

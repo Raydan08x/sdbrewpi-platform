@@ -17,6 +17,12 @@ sdbrewpi:
     enabled: ${HARDWARE_ENABLED:false}
   simulation:
     enabled: ${SIMULATION_ENABLED:true}
+  plc-demo:
+    enabled: ${PLC_DEMO_ENABLED:false}
+    port: ${PLC_DEMO_PORT:COM5}
+    baud-rate: ${PLC_DEMO_BAUD_RATE:115200}
+    freshness-seconds: ${PLC_DEMO_FRESHNESS_SECONDS:10}
+    history-interval-seconds: ${PLC_DEMO_HISTORY_INTERVAL_SECONDS:10}
   mqtt:
     enabled: ${MQTT_ENABLED:false}
     broker-uri: ${MQTT_BROKER_URI:tcp://192.168.1.15:1883}

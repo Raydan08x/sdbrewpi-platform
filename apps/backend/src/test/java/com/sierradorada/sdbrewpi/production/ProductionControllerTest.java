@@ -13,6 +13,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -22,6 +23,8 @@ import org.springframework.transaction.annotation.Transactional;
 class ProductionControllerTest {
     @Autowired MockMvc mvc;
     @Autowired ObjectMapper objectMapper;
+    @Autowired JdbcTemplate jdbc;
+    @Autowired ProductionService service;
 
     @Test
     void exposesDemoRecipeAndActiveBatch() throws Exception {
@@ -31,6 +34,7 @@ class ProductionControllerTest {
             .andExpect(jsonPath("$.recipes[0].steps.length()").value(3))
             .andExpect(jsonPath("$.activeBatches[0].code").value("SIM-LOTE-001"))
             .andExpect(jsonPath("$.activeBatches[0].tankId").value("TANK-01"))
+            .andExpect(jsonPath("$.activeBatches[0].profileState").value("NOT_STARTED"))
             .andExpect(jsonPath("$.processStages.length()").value(43))
             .andExpect(jsonPath("$.processStages[0].code").value("ORDER_RELEASE"))
             .andExpect(jsonPath("$.processStages[24].code").value("FERMENTATION"))
@@ -99,5 +103,59 @@ class ProductionControllerTest {
                 .content("{\"code\":\"SIM-LOTE-002\",\"recipeVersionId\":\"00000000-0000-0000-0000-000000000101\",\"tankId\":\"TANK-01\",\"volumeL\":200}"))
             .andExpect(status().isCreated())
             .andExpect(jsonPath("$.tankId").value("TANK-01"));
+
+        mvc.perform(get("/api/v1/fermentation/overview"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.tanks[0].mode").value("OFF"));
+    }
+
+    @Test
+    void startsPausesAndResumesProfileWithAuditEvents() throws Exception {
+        String batchId = "00000000-0000-0000-0000-000000000301";
+        mvc.perform(put("/api/v1/production/batches/" + batchId + "/profile/start")
+                .header("X-Actor", "qa-profile")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"expectedRevision\":0}"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.profileState").value("RUNNING"))
+            .andExpect(jsonPath("$.stepStartedAt").isNotEmpty())
+            .andExpect(jsonPath("$.stepExpectedCompleteAt").isNotEmpty());
+
+        mvc.perform(put("/api/v1/production/batches/" + batchId + "/profile/pause")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"expectedRevision\":1}"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.profileState").value("PAUSED"));
+
+        mvc.perform(put("/api/v1/production/batches/" + batchId + "/profile/resume")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"expectedRevision\":2}"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.profileState").value("RUNNING"));
+
+        mvc.perform(get("/api/v1/production/batches/" + batchId + "/events"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.length()").value(3));
+
+        mvc.perform(get("/api/v1/fermentation/overview"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.tanks[0].mode").value("AUTO"))
+            .andExpect(jsonPath("$.tanks[0].setpointC").value(18.0));
+    }
+
+    @Test
+    void advancesOverdueProfileStepAndUpdatesSetpoint() throws Exception {
+        String batchId = "00000000-0000-0000-0000-000000000301";
+        jdbc.update("UPDATE production_batch SET profile_state = 'RUNNING', step_started_at = ?, revision = 1 WHERE id = ?",
+            java.sql.Timestamp.from(java.time.Instant.now().minusSeconds(121 * 3600L)), batchId);
+
+        service.advanceProfiles();
+
+        mvc.perform(get("/api/v1/production/overview"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.activeBatches[0].currentStep").value(2));
+        mvc.perform(get("/api/v1/fermentation/overview"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.tanks[0].setpointC").value(20.0));
     }
 }

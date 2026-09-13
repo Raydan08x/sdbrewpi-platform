@@ -1,4 +1,4 @@
-import type { ControlMode, Overview, PlantAsset, PlantAssetInput, PlantOverview, PlantProfile, PlantStorageLocation, PlantStorageLocationInput, PlantWarehouse, PlantWarehouseInput, ProductionOverview, Tank } from './types'
+import type { ControlMode, FermentationHistory, Overview, PlantAsset, PlantAssetInput, PlantOverview, PlantProfile, PlantStorageLocation, PlantStorageLocationInput, PlantWarehouse, PlantWarehouseInput, ProductionOverview, Tank } from './types'
 
 async function request<T>(url: string, init?: RequestInit): Promise<T> {
   const response = await fetch(url, { ...init, headers: { 'Content-Type': 'application/json', 'X-Actor': 'local-webapp', ...init?.headers } })
@@ -14,6 +14,7 @@ async function request<T>(url: string, init?: RequestInit): Promise<T> {
 }
 
 export const getOverview = () => request<Overview>('/api/v1/fermentation/overview')
+export const getTankHistory = (tankId: string) => request<FermentationHistory>(`/api/v1/fermentation/tanks/${tankId}/history?hours=24&limit=720`)
 export const getProductionOverview = () => request<ProductionOverview>('/api/v1/production/overview')
 export const getPlantOverview = () => request<PlantOverview>('/api/v1/plant/overview')
 
@@ -72,3 +73,8 @@ export const setMode = (tank: Tank, mode: ControlMode) => request('/api/v1/ferme
 export const setSetpoint = (tank: Tank, setpointC: number) => request('/api/v1/fermentation/tanks/' + tank.id + '/setpoint', {
   method: 'PUT', body: JSON.stringify({ setpointC, expectedRevision: tank.revision })
 })
+
+export const controlProfile = (batchId: string, action: 'start' | 'pause' | 'resume', expectedRevision: number) =>
+  request(`/api/v1/production/batches/${batchId}/profile/${action}`, {
+    method: 'PUT', body: JSON.stringify({ expectedRevision })
+  })

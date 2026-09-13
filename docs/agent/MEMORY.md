@@ -35,3 +35,6 @@
 - Los equipos de Mi Planta admiten alta, edición y retiro lógico con revisión optimista y bitácora.
 - Mi Planta admite bodegas con finalidad, control térmico, categorías permitidas y ubicaciones internas; inicia vacío para no inventar la distribución física de la sede.
 - Producción abre en una ruta base de 43 etapas. Fermentación es una estación interna; los pasos opcionales y el envasado por barril, botella o lata aún no se ejecutan como workflow.
+- COM3 es el módulo de seis relés y buzzer; COM5 es la pantalla/PLC que emite la demo de F1/F2. El propietario está modificando ambos firmwares: no flashearlos, modificarlos ni enviarles comandos.
+- Fermentación admite COM5 en `PLC_DEMO_READ_ONLY`, deshabilitado por defecto, y conserva curvas y alarmas persistentes. La prueba física recibió cuatro muestras antes de que la demo dejara de emitir y confirmó el estado degradado posterior.
+- Los perfiles de fermentación se pueden iniciar, pausar y reanudar; un planificador avanza fases por tiempo, actualiza el setpoint y registra eventos. Al cerrar el lote, el control del tanque vuelve a `OFF`. Todavía faltan rampas y registros manuales/adiciones.

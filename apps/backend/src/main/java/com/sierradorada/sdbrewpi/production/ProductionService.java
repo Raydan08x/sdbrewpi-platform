@@ -1,18 +1,26 @@
 package com.sierradorada.sdbrewpi.production;
 
 import com.sierradorada.sdbrewpi.shared.RevisionConflictException;
+import com.sierradorada.sdbrewpi.fermentation.FermentationRepository;
+import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.Locale;
+import java.util.List;
 import java.util.UUID;
+import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class ProductionService {
     private final ProductionRepository repository;
+    private final FermentationRepository fermentationRepository;
 
-    public ProductionService(ProductionRepository repository) { this.repository = repository; }
+    public ProductionService(ProductionRepository repository, FermentationRepository fermentationRepository) {
+        this.repository = repository;
+        this.fermentationRepository = fermentationRepository;
+    }
 
     public ProductionOverview overview() {
         return new ProductionOverview(Instant.now(), repository.findRecipes(), repository.findActiveBatches(),
@@ -68,9 +76,107 @@ public class ProductionService {
         if (repository.completeBatch(id, request.expectedRevision(), Instant.now()) == 0) {
             throw new RevisionConflictException();
         }
+        fermentationRepository.disableProfileControl(existing.tankId());
         repository.audit(UUID.randomUUID().toString(), safeActor(actor), id, "COMPLETE_BATCH", existing.code(),
             "Lote marcado como completado");
         return repository.findBatch(id).orElseThrow();
+    }
+
+    @Transactional
+    public BatchView startProfile(String id, ProfileCommandRequest request, String actor) {
+        BatchView batch = activeBatch(id);
+        requireState(batch, "NOT_STARTED", "El perfil ya fue iniciado");
+        Instant now = Instant.now();
+        if (repository.startProfile(id, request.expectedRevision(), now) == 0) throw new RevisionConflictException();
+        ProfileStepView step = batch.profile().getFirst();
+        fermentationRepository.configureForProfile(batch.tankId(), step.targetTemperatureC());
+        recordProfileCommand(batch, "PROFILE_STARTED", step.order(), safeActor(actor),
+            "Perfil iniciado en " + step.name(), now);
+        return repository.findBatch(id).orElseThrow();
+    }
+
+    @Transactional
+    public BatchView pauseProfile(String id, ProfileCommandRequest request, String actor) {
+        BatchView batch = activeBatch(id);
+        requireState(batch, "RUNNING", "El perfil no está ejecutándose");
+        Instant now = Instant.now();
+        long elapsed = Math.max(0, Duration.between(batch.stepStartedAt(), now).toSeconds());
+        if (repository.pauseProfile(id, request.expectedRevision(), elapsed) == 0) throw new RevisionConflictException();
+        recordProfileCommand(batch, "PROFILE_PAUSED", batch.currentStep(), safeActor(actor),
+            "Perfil pausado; el objetivo térmico se mantiene", now);
+        return repository.findBatch(id).orElseThrow();
+    }
+
+    @Transactional
+    public BatchView resumeProfile(String id, ProfileCommandRequest request, String actor) {
+        BatchView batch = activeBatch(id);
+        requireState(batch, "PAUSED", "El perfil no está pausado");
+        Instant now = Instant.now();
+        Instant reconstructedStart = now.minusSeconds(Math.max(0, batch.stepElapsedSeconds()));
+        if (repository.resumeProfile(id, request.expectedRevision(), reconstructedStart) == 0) {
+            throw new RevisionConflictException();
+        }
+        ProfileStepView step = currentStep(batch);
+        fermentationRepository.configureForProfile(batch.tankId(), step.targetTemperatureC());
+        recordProfileCommand(batch, "PROFILE_RESUMED", step.order(), safeActor(actor),
+            "Perfil reanudado en " + step.name(), now);
+        return repository.findBatch(id).orElseThrow();
+    }
+
+    public List<BatchEventView> events(String id) {
+        repository.findBatch(id).orElseThrow(() -> new IllegalArgumentException("El lote no existe"));
+        return repository.findEvents(id);
+    }
+
+    @Scheduled(fixedDelay = 5000)
+    @Transactional
+    public void advanceProfiles() {
+        Instant now = Instant.now();
+        for (BatchView candidate : repository.findRunningProfiles()) advanceDueSteps(candidate, now);
+    }
+
+    private void advanceDueSteps(BatchView initial, Instant now) {
+        BatchView batch = initial;
+        while ("RUNNING".equals(batch.profileState()) && batch.stepExpectedCompleteAt() != null
+                && !now.isBefore(batch.stepExpectedCompleteAt())) {
+            Instant transitionAt = batch.stepExpectedCompleteAt();
+            int nextOrder = batch.currentStep() + 1;
+            if (nextOrder > batch.profile().size()) {
+                if (repository.finishProfile(batch.id(), batch.revision(), transitionAt) == 0) return;
+                repository.event(UUID.randomUUID().toString(), batch.id(), "PROFILE_COMPLETED", batch.currentStep(),
+                    "profile-engine", "Perfil térmico completado; se mantiene el último objetivo", transitionAt);
+            } else {
+                if (repository.advanceProfileStep(batch.id(), batch.revision(), nextOrder, transitionAt) == 0) return;
+                ProfileStepView next = batch.profile().get(nextOrder - 1);
+                fermentationRepository.configureForProfile(batch.tankId(), next.targetTemperatureC());
+                repository.event(UUID.randomUUID().toString(), batch.id(), "PROFILE_STEP_CHANGED", nextOrder,
+                    "profile-engine", "Inicio automático de " + next.name(), transitionAt);
+            }
+            batch = repository.findBatch(batch.id()).orElseThrow();
+        }
+    }
+
+    private BatchView activeBatch(String id) {
+        BatchView batch = repository.findBatch(id)
+            .orElseThrow(() -> new IllegalArgumentException("El lote no existe"));
+        if (!"ACTIVE".equals(batch.status())) throw new IllegalStateException("El lote ya está cerrado");
+        if (batch.profile().isEmpty()) throw new IllegalStateException("El lote no tiene perfil de fermentación");
+        return batch;
+    }
+
+    private void requireState(BatchView batch, String expected, String message) {
+        if (!expected.equals(batch.profileState())) throw new IllegalStateException(message);
+    }
+
+    private ProfileStepView currentStep(BatchView batch) {
+        int index = Math.max(0, Math.min(batch.currentStep() - 1, batch.profile().size() - 1));
+        return batch.profile().get(index);
+    }
+
+    private void recordProfileCommand(BatchView batch, String type, Integer step, String actor, String message,
+            Instant now) {
+        repository.event(UUID.randomUUID().toString(), batch.id(), type, step, actor, message, now);
+        repository.audit(UUID.randomUUID().toString(), actor, batch.id(), type, batch.code(), message);
     }
 
     private String normalizeCode(String value) {

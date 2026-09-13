@@ -8,6 +8,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
@@ -23,6 +24,13 @@ public class FermentationController {
         return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(service.overview());
     }
 
+    @GetMapping("/tanks/{id}/history")
+    ResponseEntity<FermentationHistoryView> history(@PathVariable String id,
+            @RequestParam(defaultValue = "24") int hours,
+            @RequestParam(defaultValue = "720") int limit) {
+        return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(service.history(id, hours, limit));
+    }
+
     @PutMapping("/tanks/{id}/setpoint")
     CommandResult setpoint(@PathVariable String id, @Valid @RequestBody SetpointRequest request,
             @RequestHeader(value = "X-Actor", required = false) String actor) {
@@ -35,4 +43,3 @@ public class FermentationController {
         return service.mode(id, request, actor);
     }
 }
-

@@ -107,7 +107,12 @@ try {
   })
   await delay(900)
   const production = await inspectLayout('Producción')
-  const results = [plant, warehouseEditor, production]
+  await send('Runtime.evaluate', {
+    expression: `([...document.querySelectorAll('button')].find(button => button.textContent.includes('Fermentación'))).click()`,
+  })
+  await delay(1200)
+  const fermentation = await inspectLayout('Fermentación')
+  const results = [plant, warehouseEditor, production, fermentation]
   console.log(JSON.stringify(results, null, 2))
   socket.close()
   if (results.some(result => result.documentWidth > result.viewportWidth || result.offenders.length > 0)) process.exitCode = 1
