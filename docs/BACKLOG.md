@@ -27,7 +27,7 @@
 
 - [x] Alta, edición y retiro lógico de equipos, sensores, capacidades y conexiones.
 - [ ] Modelo de circuitos, tramos y remanentes de tubería.
-- [ ] Bodegas y ubicaciones físicas de la sede.
+- [x] Bodegas, categorías permitidas y ubicaciones físicas de la sede.
 - [ ] Agente local para descubrir controladores compatibles por USB.
 - [ ] Catálogo firmado de firmware por familia y revisión de hardware.
 - [ ] Flujo de respaldo, instalación, autoprueba y registro sin habilitar salidas.

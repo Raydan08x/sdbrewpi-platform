@@ -98,11 +98,16 @@ try {
   }
   const plant = await inspectLayout('Mi Planta')
   await send('Runtime.evaluate', {
+    expression: `([...document.querySelectorAll('button')].find(button => button.textContent.includes('Agregar bodega'))).click()`,
+  })
+  await delay(300)
+  const warehouseEditor = await inspectLayout('Editor de bodega')
+  await send('Runtime.evaluate', {
     expression: `([...document.querySelectorAll('nav button')].find(button => button.textContent.includes('Producción'))).click()`,
   })
   await delay(900)
   const production = await inspectLayout('Producción')
-  const results = [plant, production]
+  const results = [plant, warehouseEditor, production]
   console.log(JSON.stringify(results, null, 2))
   socket.close()
   if (results.some(result => result.documentWidth > result.viewportWidth || result.offenders.length > 0)) process.exitCode = 1

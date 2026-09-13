@@ -36,6 +36,7 @@ class PlantControllerTest {
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.site.code").value("MAIN"))
             .andExpect(jsonPath("$.assets.length()").value(13))
+            .andExpect(jsonPath("$.warehouses.length()").value(0))
             .andExpect(jsonPath("$.onboarding.status").value("WAITING_FOR_CONNECTION"))
             .andExpect(jsonPath("$.onboarding.scannerEnabled").value(false))
             .andExpect(jsonPath("$.onboarding.hardwareOutputsEnabled").value(false));
@@ -131,6 +132,85 @@ class PlantControllerTest {
                 .content("""
                     {"code":"BAD-01","assetType":"DESCONOCIDO","name":"Equipo inválido",
                      "status":"AVAILABLE","controllable":false}
+                    """))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.code").value("INVALID_COMMAND"));
+    }
+
+    @Test
+    void managesWarehouseCategoriesAndStorageLocations() throws Exception {
+        String warehouseJson = mvc.perform(post("/api/v1/plant/sites/" + SITE_ID + "/warehouses")
+                .header("X-Actor", "qa")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {"code":"bod-principal","name":"Bodega principal","purpose":"GENERAL",
+                     "temperatureControlled":false,
+                     "allowedCategories":["RAW_MATERIAL","PACKAGING_MATERIAL"],"notes":"Prueba"}
+                    """))
+            .andExpect(status().isCreated())
+            .andExpect(jsonPath("$.code").value("BOD-PRINCIPAL"))
+            .andExpect(jsonPath("$.allowedCategories.length()").value(2))
+            .andExpect(jsonPath("$.locations.length()").value(0))
+            .andReturn().getResponse().getContentAsString();
+        String warehouseId = objectMapper.readTree(warehouseJson).get("id").asText();
+
+        mvc.perform(put("/api/v1/plant/warehouses/" + warehouseId)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {"code":"BOD-PRINCIPAL","name":"Bodega seca","purpose":"RAW_MATERIALS",
+                     "temperatureControlled":true,
+                     "allowedCategories":["RAW_MATERIAL","PACKAGING_MATERIAL","OPERATING_SUPPLY"],
+                     "notes":"Humedad controlada","expectedRevision":0}
+                    """))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.name").value("Bodega seca"))
+            .andExpect(jsonPath("$.temperatureControlled").value(true))
+            .andExpect(jsonPath("$.revision").value(1));
+
+        String locationJson = mvc.perform(post("/api/v1/plant/warehouses/" + warehouseId + "/locations")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {"code":"rack-a","name":"Rack A","locationType":"RACK","notes":"Zona norte"}
+                    """))
+            .andExpect(status().isCreated())
+            .andExpect(jsonPath("$.code").value("RACK-A"))
+            .andReturn().getResponse().getContentAsString();
+        String locationId = objectMapper.readTree(locationJson).get("id").asText();
+
+        mvc.perform(put("/api/v1/plant/locations/" + locationId)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {"code":"RACK-A","name":"Rack de maltas","locationType":"RACK",
+                     "notes":"Zona norte","expectedRevision":0}
+                    """))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.name").value("Rack de maltas"))
+            .andExpect(jsonPath("$.revision").value(1));
+
+        mvc.perform(put("/api/v1/plant/locations/" + locationId + "/retire")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"expectedRevision\":1}"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.active").value(false));
+
+        mvc.perform(put("/api/v1/plant/warehouses/" + warehouseId + "/retire")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"expectedRevision\":1}"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.active").value(false));
+
+        mvc.perform(get("/api/v1/plant/overview"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.warehouses.length()").value(0));
+    }
+
+    @Test
+    void rejectsUnknownWarehouseCategory() throws Exception {
+        mvc.perform(post("/api/v1/plant/sites/" + SITE_ID + "/warehouses")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {"code":"BOD-BAD","name":"Bodega inválida","purpose":"GENERAL",
+                     "temperatureControlled":false,"allowedCategories":["DESCONOCIDA"],"notes":""}
                     """))
             .andExpect(status().isBadRequest())
             .andExpect(jsonPath("$.code").value("INVALID_COMMAND"));

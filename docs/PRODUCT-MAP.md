@@ -41,6 +41,8 @@ Un único catálogo de artículos tendrá una categoría y una unidad base. Las 
 
 Las bodegas no equivalen a categorías: una misma categoría puede existir en varias bodegas y una bodega puede guardar distintas categorías si sus reglas lo permiten.
 
+Mi Planta ya permite registrar, editar y retirar lógicamente bodegas y sus ubicaciones internas. Cada bodega declara una finalidad principal, si requiere control térmico y las categorías de inventario que admite. Los artículos, existencias y movimientos consumirán esta configuración sin duplicar la estructura física.
+
 ## Instalación plug-and-play prevista
 
 El instalador local deberá seguir una secuencia explícita y reversible:

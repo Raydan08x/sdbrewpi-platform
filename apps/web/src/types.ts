@@ -140,10 +140,42 @@ export interface PlantAsset {
 
 export type PlantAssetInput = Omit<PlantAsset, 'id' | 'siteId' | 'revision' | 'active' | 'updatedAt'>
 
+export interface PlantStorageLocation {
+  id: string
+  warehouseId: string
+  code: string
+  name: string
+  locationType: string
+  notes: string
+  revision: number
+  active: boolean
+  updatedAt: string
+}
+
+export type PlantStorageLocationInput = Omit<PlantStorageLocation, 'id' | 'warehouseId' | 'revision' | 'active' | 'updatedAt'>
+
+export interface PlantWarehouse {
+  id: string
+  siteId: string
+  code: string
+  name: string
+  purpose: string
+  temperatureControlled: boolean
+  notes: string
+  allowedCategories: string[]
+  locations: PlantStorageLocation[]
+  revision: number
+  active: boolean
+  updatedAt: string
+}
+
+export type PlantWarehouseInput = Omit<PlantWarehouse, 'id' | 'siteId' | 'locations' | 'revision' | 'active' | 'updatedAt'>
+
 export interface PlantOverview {
   generatedAt: string
   site: PlantProfile
   assets: PlantAsset[]
+  warehouses: PlantWarehouse[]
   onboarding: {
     status: string
     scannerEnabled: boolean

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { AlertTriangle, Cable, Check, CircleGauge, Cpu, Factory, FlaskConical, HardDriveDownload, Pencil, Plus, RefreshCw, Save, Snowflake, Trash2, Waves, X } from 'lucide-react'
 import { createPlantAsset, getPlantOverview, retirePlantAsset, updatePlantAsset, updatePlantProfile } from './api'
 import type { PlantAsset, PlantAssetInput, PlantOverview, PlantProfile } from './types'
+import WarehouseSection from './WarehouseSection'
 
 type Draft = Omit<PlantProfile, 'id' | 'code' | 'revision' | 'updatedAt'>
 
@@ -170,6 +171,7 @@ export default function PlantPage() {
         <div className="section-title"><div><span className="line"/><h3>INVENTARIO TÉCNICO</h3></div><div className="section-actions"><small>{overview.assets.length} activos en esta sede</small><button type="button" onClick={startCreateAsset}><Plus size={14}/>Agregar equipo</button></div></div>
         {groups.map(([type, assets]) => <div className="asset-group" key={type}><h4>{typeLabels[type] ?? type}</h4><div className="asset-grid">{assets.map(asset => <AssetCard key={asset.id} asset={asset} onEdit={startEditAsset}/>)}</div></div>)}
       </section>
+      <WarehouseSection siteId={overview.site.id} warehouses={overview.warehouses} onChanged={load}/>
       <section className="plant-calculation-note"><CircleGauge/><div><b>Base para balances y costos</b><span>La capacidad nominal, el remanente de tubería y las capacidades de cada equipo alimentarán rendimientos, pérdidas, agua, energía y costo por lote.</span></div><Waves/></section>
     </>}
   </main>

@@ -28,7 +28,7 @@ docker compose down
 
 ## Línea base verificada — 2026-09-12
 
-- Backend: 29 pruebas aprobadas, incluidas histéresis, validación, concurrencia, CORS, parsing MQTT, ingestión segura, recetas versionadas, lotes, catálogo de producción y gestión de equipos con revisión optimista.
+- Backend: 31 pruebas aprobadas, incluidas histéresis, validación, concurrencia, CORS, parsing MQTT, ingestión segura, recetas versionadas, lotes, catálogo de producción y gestión de equipos, bodegas y ubicaciones con revisión optimista.
 - Frontend: lint, compilación TypeScript/Vite y auditoría npm sin vulnerabilidades.
 - Responsive: viewport móvil real de 390 px sin desbordamiento horizontal ni elementos recortados.
 - API local: salud, lectura de dos tanques, setpoint/modo, demanda de frío, rechazo inválido y conflicto 409.
@@ -36,6 +36,7 @@ docker compose down
 - Producción: perfil de demostración visible, snapshot de receta conservado y un solo lote activo permitido por fermentador.
 - Mi Planta: sede y 13 activos registrados; identidad, capacidad, cantidad de fermentadores y remanente editables; URL de logo restringida a HTTP/HTTPS; instalación de firmware visible pero deshabilitada.
 - Equipos: alta, actualización, rechazo de tipo inválido y retiro lógico cubiertos; los activos retirados no aparecen en el inventario operativo.
+- Bodegas: estado vacío, alta, categorías permitidas, ubicación interna, edición y retiro lógico verificados desde API y WebApp.
 - Producción: 43 etapas visibles y agrupadas; Fermentación se abre como estación interna y conserva el control existente.
 - Telemetría: formatos JSON, escalares, canónico e historial offline cubiertos; muestras sin tiempo verificable excluidas del control.
 - Modo degradado: con MQTT habilitado y broker inalcanzable, la API permanece saludable, reporta la desconexión y no activa simulación ni hardware.

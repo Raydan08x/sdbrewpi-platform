@@ -20,6 +20,14 @@ public class PlantService {
         "CONTROLLER", "HMI", "RELAY_MODULE", "SENSOR_GATEWAY", "SENSOR", "PACKAGING", "FILTER", "OTHER");
     private static final Set<String> ASSET_STATUSES = Set.of(
         "DOCUMENTED", "AVAILABLE", "NEEDS_DATA", "OFFLINE", "WAITING_BATTERY", "MAINTENANCE", "OUT_OF_SERVICE");
+    private static final Set<String> WAREHOUSE_PURPOSES = Set.of(
+        "GENERAL", "RAW_MATERIALS", "PACKAGING", "PRODUCTION", "FINISHED_GOODS", "CHEMICALS",
+        "COLD_STORAGE", "QUARANTINE", "MAINTENANCE", "OTHER");
+    private static final Set<String> INVENTORY_CATEGORIES = Set.of(
+        "RAW_MATERIAL", "PACKAGING_MATERIAL", "OPERATING_SUPPLY", "WORK_IN_PROGRESS",
+        "FINISHED_GOOD", "SPARE_PART");
+    private static final Set<String> LOCATION_TYPES = Set.of(
+        "ZONE", "AISLE", "RACK", "SHELF", "FLOOR", "TANK", "ROOM", "OTHER");
     private final PlantRepository repository;
     private final boolean hardwareEnabled;
 
@@ -41,7 +49,7 @@ public class PlantService {
             profiles,
             List.of("Detectar puerto y hardware", "Leer identidad y versión", "Seleccionar firmware compatible",
                 "Verificar firma y checksum", "Crear respaldo", "Instalar y validar", "Registrar el dispositivo"));
-        return new PlantOverview(Instant.now(), site, assets, onboarding, needingData);
+        return new PlantOverview(Instant.now(), site, assets, repository.findWarehouses(site.id()), onboarding, needingData);
     }
 
     @Transactional
@@ -101,11 +109,117 @@ public class PlantService {
         return repository.findAsset(id).orElseThrow();
     }
 
+    @Transactional
+    public PlantWarehouseView createWarehouse(String siteId, PlantWarehouseCreateRequest request, String actor) {
+        repository.findSite(siteId).orElseThrow(() -> new IllegalArgumentException("La planta no existe"));
+        String code = normalizeCode(request.code());
+        validateWarehouse(request.purpose(), request.allowedCategories());
+        if (repository.warehouseCodeExists(siteId, code, null)) {
+            throw new IllegalStateException("Ya existe una bodega con ese código en la planta");
+        }
+        String id = UUID.randomUUID().toString();
+        repository.insertWarehouse(id, siteId, code, request, Instant.now());
+        repository.audit(UUID.randomUUID().toString(), safeActor(actor), id,
+            "CREATE_PLANT_WAREHOUSE", code, "Bodega registrada en la planta");
+        return repository.findWarehouse(id).orElseThrow();
+    }
+
+    @Transactional
+    public PlantWarehouseView updateWarehouse(String id, PlantWarehouseUpdateRequest request, String actor) {
+        PlantWarehouseView current = repository.findWarehouse(id)
+            .orElseThrow(() -> new IllegalArgumentException("La bodega no existe"));
+        if (!current.active()) throw new IllegalStateException("La bodega está retirada");
+        String code = normalizeCode(request.code());
+        validateWarehouse(request.purpose(), request.allowedCategories());
+        if (repository.warehouseCodeExists(current.siteId(), code, id)) {
+            throw new IllegalStateException("Ya existe una bodega con ese código en la planta");
+        }
+        if (repository.updateWarehouse(id, code, request, Instant.now()) == 0) throw new RevisionConflictException();
+        repository.audit(UUID.randomUUID().toString(), safeActor(actor), id,
+            "UPDATE_PLANT_WAREHOUSE", code, "Bodega actualizada");
+        return repository.findWarehouse(id).orElseThrow();
+    }
+
+    @Transactional
+    public PlantWarehouseView retireWarehouse(String id, PlantAssetRetireRequest request, String actor) {
+        PlantWarehouseView current = repository.findWarehouse(id)
+            .orElseThrow(() -> new IllegalArgumentException("La bodega no existe"));
+        if (!current.active()) throw new IllegalStateException("La bodega ya está retirada");
+        Instant now = Instant.now();
+        if (repository.retireWarehouse(id, request.expectedRevision(), now) == 0) throw new RevisionConflictException();
+        repository.retireLocationsForWarehouse(id, now);
+        repository.audit(UUID.randomUUID().toString(), safeActor(actor), id,
+            "RETIRE_PLANT_WAREHOUSE", current.code(), "Bodega y ubicaciones retiradas del inventario activo");
+        return repository.findWarehouse(id).orElseThrow();
+    }
+
+    @Transactional
+    public PlantStorageLocationView createLocation(String warehouseId,
+            PlantStorageLocationCreateRequest request, String actor) {
+        PlantWarehouseView warehouse = repository.findWarehouse(warehouseId)
+            .orElseThrow(() -> new IllegalArgumentException("La bodega no existe"));
+        if (!warehouse.active()) throw new IllegalStateException("La bodega está retirada");
+        String code = normalizeCode(request.code());
+        validateLocationType(request.locationType());
+        if (repository.locationCodeExists(warehouseId, code, null)) {
+            throw new IllegalStateException("Ya existe una ubicación con ese código en la bodega");
+        }
+        String id = UUID.randomUUID().toString();
+        repository.insertLocation(id, warehouseId, code, request, Instant.now());
+        repository.audit(UUID.randomUUID().toString(), safeActor(actor), id,
+            "CREATE_STORAGE_LOCATION", code, "Ubicación registrada en la bodega " + warehouse.code());
+        return repository.findLocation(id).orElseThrow();
+    }
+
+    @Transactional
+    public PlantStorageLocationView updateLocation(String id, PlantStorageLocationUpdateRequest request, String actor) {
+        PlantStorageLocationView current = repository.findLocation(id)
+            .orElseThrow(() -> new IllegalArgumentException("La ubicación no existe"));
+        if (!current.active()) throw new IllegalStateException("La ubicación está retirada");
+        String code = normalizeCode(request.code());
+        validateLocationType(request.locationType());
+        if (repository.locationCodeExists(current.warehouseId(), code, id)) {
+            throw new IllegalStateException("Ya existe una ubicación con ese código en la bodega");
+        }
+        if (repository.updateLocation(id, code, request, Instant.now()) == 0) throw new RevisionConflictException();
+        repository.audit(UUID.randomUUID().toString(), safeActor(actor), id,
+            "UPDATE_STORAGE_LOCATION", code, "Ubicación de bodega actualizada");
+        return repository.findLocation(id).orElseThrow();
+    }
+
+    @Transactional
+    public PlantStorageLocationView retireLocation(String id, PlantAssetRetireRequest request, String actor) {
+        PlantStorageLocationView current = repository.findLocation(id)
+            .orElseThrow(() -> new IllegalArgumentException("La ubicación no existe"));
+        if (!current.active()) throw new IllegalStateException("La ubicación ya está retirada");
+        if (repository.retireLocation(id, request.expectedRevision(), Instant.now()) == 0) {
+            throw new RevisionConflictException();
+        }
+        repository.audit(UUID.randomUUID().toString(), safeActor(actor), id,
+            "RETIRE_STORAGE_LOCATION", current.code(), "Ubicación retirada de la bodega");
+        return repository.findLocation(id).orElseThrow();
+    }
+
     private void validateAsset(String typeValue, String statusValue) {
         String type = typeValue.trim().toUpperCase(Locale.ROOT);
         String status = statusValue.trim().toUpperCase(Locale.ROOT);
         if (!ASSET_TYPES.contains(type)) throw new IllegalArgumentException("El tipo de equipo no es válido");
         if (!ASSET_STATUSES.contains(status)) throw new IllegalArgumentException("El estado del equipo no es válido");
+    }
+
+    private void validateWarehouse(String purposeValue, List<String> categories) {
+        String purpose = purposeValue.trim().toUpperCase(Locale.ROOT);
+        if (!WAREHOUSE_PURPOSES.contains(purpose)) throw new IllegalArgumentException("La finalidad de la bodega no es válida");
+        boolean invalidCategory = categories.stream()
+            .map(value -> value.trim().toUpperCase(Locale.ROOT))
+            .anyMatch(category -> !INVENTORY_CATEGORIES.contains(category));
+        if (invalidCategory) throw new IllegalArgumentException("La categoría permitida de inventario no es válida");
+    }
+
+    private void validateLocationType(String value) {
+        if (!LOCATION_TYPES.contains(value.trim().toUpperCase(Locale.ROOT))) {
+            throw new IllegalArgumentException("El tipo de ubicación no es válido");
+        }
     }
 
     private String normalizeCode(String value) {

@@ -33,4 +33,5 @@
 - Producción contiene recetas versionadas, fases y lotes activos. `DEMO-PALE-ALE` y `SIM-LOTE-001` son datos exclusivos de simulación.
 - Mi Planta es la pantalla inicial y registra una sede y 13 activos conocidos. El escáner USB y la instalación de firmware están especificados pero deshabilitados.
 - Los equipos de Mi Planta admiten alta, edición y retiro lógico con revisión optimista y bitácora.
+- Mi Planta admite bodegas con finalidad, control térmico, categorías permitidas y ubicaciones internas; inicia vacío para no inventar la distribución física de la sede.
 - Producción abre en una ruta base de 43 etapas. Fermentación es una estación interna; los pasos opcionales y el envasado por barril, botella o lata aún no se ejecutan como workflow.
