@@ -57,4 +57,20 @@ El instalador local deberá seguir una secuencia explícita y reversible:
 
 El backend expondrá trabajos de instalación y su progreso. Un agente local con acceso USB hará la detección y el flasheo. El navegador nunca accederá directamente a puertos industriales. Los perfiles se versionarán por familia, revisión de hardware y esquema de configuración. Un firmware desconocido o una revisión ambigua debe detener el proceso.
 
-En la etapa actual la interfaz solo muestra el registro y la secuencia futura. El escáner y la instalación permanecen deshabilitados hasta disponer del hardware conectado y validar cada perfil.
+En la etapa actual los equipos pueden registrarse, editarse y retirarse de forma lógica. El escáner y la instalación permanecen deshabilitados hasta disponer del hardware conectado y validar cada perfil.
+
+## Ruta base de producción
+
+Producción abre en una vista general del lote. Fermentación es una estación de esa ruta y conserva su pantalla de control térmico independiente.
+
+La ruta base contiene 43 etapas agrupadas así:
+
+1. Preparación: liberar orden, armar kit y pesajes, limpieza previa, tratamiento y llenado de agua, molienda.
+2. Maceración y separación: empaste, sales y ajustes, control de pH, maceración, mash out, recirculado, filtrado del mosto, lavado y controles pre-cocción.
+3. Cocción: hervor, adiciones, whirlpool/reposo y control post-cocción.
+4. Lado frío: enfriado, transferencia sanitaria, oxigenación e inoculación.
+5. Bodega fría: fermentación, dry hopping, descanso de diacetilo, manejo de levadura/trub, cold crash, maduración, transferencia a tanque brillante, clarificación, filtración y carbonatación.
+6. Envasado: preparación y sanitización, ruta de barril, botella o lata, pasteurización opcional, control de calidad, etiquetado y empaque secundario.
+7. Cierre: liberación a producto terminado y limpieza posterior.
+
+Los pasos opcionales y las alternativas de envasado se activarán por la versión de receta y la orden de producción. El catálogo no implica todavía ejecución automática ni accionamiento físico.

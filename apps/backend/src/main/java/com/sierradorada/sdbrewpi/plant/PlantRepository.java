@@ -5,6 +5,7 @@ import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.List;
+import java.util.Locale;
 import java.util.Optional;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
@@ -25,8 +26,45 @@ public class PlantRepository {
     }
 
     public List<PlantAssetView> findAssets(String siteId) {
-        return jdbc.query("SELECT * FROM plant_asset WHERE site_id = ? ORDER BY asset_type, code",
+        return jdbc.query("SELECT * FROM plant_asset WHERE site_id = ? AND active = TRUE ORDER BY asset_type, code",
             (rs, row) -> mapAsset(rs), siteId);
+    }
+
+    public Optional<PlantAssetView> findAsset(String id) {
+        return jdbc.query("SELECT * FROM plant_asset WHERE id = ?", (rs, row) -> mapAsset(rs), id)
+            .stream().findFirst();
+    }
+
+    public boolean assetCodeExists(String siteId, String code, String exceptId) {
+        Integer count = jdbc.queryForObject("SELECT COUNT(*) FROM plant_asset WHERE site_id = ? AND code = ? AND id <> ?",
+            Integer.class, siteId, code, exceptId == null ? "" : exceptId);
+        return count != null && count > 0;
+    }
+
+    public void insertAsset(String id, String siteId, String code, PlantAssetCreateRequest request, Instant now) {
+        jdbc.update("INSERT INTO plant_asset (id, site_id, code, asset_type, name, manufacturer, model, capacity_l, "
+            + "electrical_spec, communication_protocol, device_identifier, firmware_profile, status, controllable, "
+            + "notes, revision, active, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, TRUE, ?)",
+            id, siteId, code, request.assetType().trim().toUpperCase(Locale.ROOT), request.name().trim(), clean(request.manufacturer()),
+            clean(request.model()), request.capacityL(), clean(request.electricalSpec()),
+            clean(request.communicationProtocol()), clean(request.deviceIdentifier()), clean(request.firmwareProfile()),
+            request.status().trim().toUpperCase(Locale.ROOT), request.controllable(), clean(request.notes()), Timestamp.from(now));
+    }
+
+    public int updateAsset(String id, String code, PlantAssetUpdateRequest request, Instant now) {
+        return jdbc.update("UPDATE plant_asset SET code = ?, asset_type = ?, name = ?, manufacturer = ?, model = ?, "
+            + "capacity_l = ?, electrical_spec = ?, communication_protocol = ?, device_identifier = ?, "
+            + "firmware_profile = ?, status = ?, controllable = ?, notes = ?, revision = revision + 1, updated_at = ? "
+            + "WHERE id = ? AND active = TRUE AND revision = ?",
+            code, request.assetType().trim().toUpperCase(Locale.ROOT), request.name().trim(), clean(request.manufacturer()), clean(request.model()),
+            request.capacityL(), clean(request.electricalSpec()), clean(request.communicationProtocol()),
+            clean(request.deviceIdentifier()), clean(request.firmwareProfile()), request.status().trim().toUpperCase(Locale.ROOT),
+            request.controllable(), clean(request.notes()), Timestamp.from(now), id, request.expectedRevision());
+    }
+
+    public int retireAsset(String id, long expectedRevision, Instant now) {
+        return jdbc.update("UPDATE plant_asset SET active = FALSE, status = 'RETIRED', revision = revision + 1, "
+            + "updated_at = ? WHERE id = ? AND active = TRUE AND revision = ?", Timestamp.from(now), id, expectedRevision);
     }
 
     public int updateProfile(String id, PlantProfileRequest request, Instant updatedAt) {
@@ -38,9 +76,9 @@ public class PlantRepository {
             request.pipingDeadVolumeL(), clean(request.logoUrl()), Timestamp.from(updatedAt), id, request.expectedRevision());
     }
 
-    public void audit(String id, String actor, String target, String payload) {
+    public void audit(String id, String actor, String target, String type, String payload, String reason) {
         jdbc.update("INSERT INTO command_audit VALUES (?, ?, ?, ?, ?, ?, ?, ?)", id, Timestamp.from(Instant.now()),
-            actor, target, "UPDATE_PLANT_PROFILE", payload, "ACCEPTED", "Configuración de planta actualizada");
+            actor, target, type, payload, "ACCEPTED", reason);
     }
 
     private PlantProfileView mapSite(ResultSet rs) throws SQLException {
@@ -57,7 +95,8 @@ public class PlantRepository {
             nullableDouble(rs, "capacity_l"), rs.getString("electrical_spec"),
             rs.getString("communication_protocol"), rs.getString("device_identifier"),
             rs.getString("firmware_profile"), rs.getString("status"), rs.getBoolean("controllable"),
-            rs.getString("notes"), rs.getLong("revision"));
+            rs.getString("notes"), rs.getLong("revision"), rs.getBoolean("active"),
+            rs.getTimestamp("updated_at").toInstant());
     }
 
     private Double nullableDouble(ResultSet rs, String column) throws SQLException {

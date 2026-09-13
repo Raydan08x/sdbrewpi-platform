@@ -72,9 +72,10 @@ try {
   })
   await send('Page.navigate', { url })
   await delay(1800)
-  const evaluation = await send('Runtime.evaluate', {
-    returnByValue: true,
-    expression: `(() => {
+  const inspectLayout = async label => {
+    const evaluation = await send('Runtime.evaluate', {
+      returnByValue: true,
+      expression: `(() => {
       const viewportWidth = document.documentElement.clientWidth;
       const offenders = [...document.querySelectorAll('body *')]
         .map(element => ({
@@ -86,16 +87,25 @@ try {
         .filter(box => box.left < -1 || box.right > viewportWidth + 1)
         .slice(0, 12);
       return {
+        label: ${JSON.stringify(label)},
         viewportWidth,
         documentWidth: document.documentElement.scrollWidth,
         offenders,
       };
     })()`,
+    })
+    return evaluation.result.value
+  }
+  const plant = await inspectLayout('Mi Planta')
+  await send('Runtime.evaluate', {
+    expression: `([...document.querySelectorAll('nav button')].find(button => button.textContent.includes('Producción'))).click()`,
   })
-  const result = evaluation.result.value
-  console.log(JSON.stringify(result, null, 2))
+  await delay(900)
+  const production = await inspectLayout('Producción')
+  const results = [plant, production]
+  console.log(JSON.stringify(results, null, 2))
   socket.close()
-  if (result.documentWidth > result.viewportWidth || result.offenders.length > 0) process.exitCode = 1
+  if (results.some(result => result.documentWidth > result.viewportWidth || result.offenders.length > 0)) process.exitCode = 1
 } finally {
   browser.kill()
   await delay(300)

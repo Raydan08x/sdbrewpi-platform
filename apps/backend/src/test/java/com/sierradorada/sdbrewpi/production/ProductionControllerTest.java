@@ -30,7 +30,11 @@ class ProductionControllerTest {
             .andExpect(jsonPath("$.recipes[0].code").value("DEMO-PALE-ALE"))
             .andExpect(jsonPath("$.recipes[0].steps.length()").value(3))
             .andExpect(jsonPath("$.activeBatches[0].code").value("SIM-LOTE-001"))
-            .andExpect(jsonPath("$.activeBatches[0].tankId").value("TANK-01"));
+            .andExpect(jsonPath("$.activeBatches[0].tankId").value("TANK-01"))
+            .andExpect(jsonPath("$.processStages.length()").value(43))
+            .andExpect(jsonPath("$.processStages[0].code").value("ORDER_RELEASE"))
+            .andExpect(jsonPath("$.processStages[24].code").value("FERMENTATION"))
+            .andExpect(jsonPath("$.processStages[35].variant").value("KEG"));
     }
 
     @Test

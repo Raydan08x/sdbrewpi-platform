@@ -1,0 +1,51 @@
+ALTER TABLE plant_asset ADD COLUMN active BOOLEAN DEFAULT TRUE NOT NULL;
+ALTER TABLE plant_asset ADD COLUMN updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP NOT NULL;
+
+CREATE TABLE process_stage_definition (
+  id VARCHAR(36) PRIMARY KEY,
+  code VARCHAR(50) NOT NULL UNIQUE,
+  phase VARCHAR(30) NOT NULL,
+  step_order INTEGER NOT NULL UNIQUE,
+  name VARCHAR(120) NOT NULL,
+  description VARCHAR(500) NOT NULL,
+  optional BOOLEAN NOT NULL,
+  variant VARCHAR(30) NOT NULL,
+  enabled BOOLEAN NOT NULL
+);
+
+INSERT INTO process_stage_definition VALUES
+('00000000-0000-0000-0000-000000000601', 'ORDER_RELEASE', 'PREPARATION', 10, 'Liberar orden de producción', 'Confirmar receta, versión, volumen, presentación y recursos del lote.', FALSE, 'ALL', TRUE),
+('00000000-0000-0000-0000-000000000602', 'WEIGHING_KIT', 'PREPARATION', 20, 'Armar kit y realizar pesajes', 'Separar, identificar y verificar materias primas y adiciones por etapa.', FALSE, 'ALL', TRUE),
+('00000000-0000-0000-0000-000000000603', 'PRE_CIP', 'PREPARATION', 30, 'Preparar y sanitizar equipos', 'Verificar limpieza, disponibilidad y liberación sanitaria del tren.', FALSE, 'ALL', TRUE),
+('00000000-0000-0000-0000-000000000604', 'WATER_TREATMENT', 'PREPARATION', 40, 'Preparar agua', 'Calcular y ejecutar tratamiento de agua según receta y análisis disponible.', FALSE, 'ALL', TRUE),
+('00000000-0000-0000-0000-000000000605', 'WATER_FILL', 'PREPARATION', 50, 'Llenar agua de proceso', 'Transferir y medir el volumen de agua requerido para maceración y lavado.', FALSE, 'ALL', TRUE),
+('00000000-0000-0000-0000-000000000606', 'MILLING', 'PREPARATION', 60, 'Molienda', 'Moler el grano y registrar cantidad, ajuste y observaciones.', FALSE, 'ALL', TRUE),
+('00000000-0000-0000-0000-000000000607', 'MASH_IN', 'MASHING', 70, 'Empaste', 'Incorporar la molienda al agua y verificar relación agua-grano.', FALSE, 'ALL', TRUE),
+('00000000-0000-0000-0000-000000000608', 'SALT_ADDITION', 'MASHING', 80, 'Agregar sales y ajustes', 'Aplicar sales, ácidos u otros ajustes definidos por la receta.', TRUE, 'ALL', TRUE),
+('00000000-0000-0000-0000-000000000609', 'MASH_REST', 'MASHING', 90, 'Maceración', 'Mantener descansos, temperaturas y tiempos del perfil de maceración.', FALSE, 'ALL', TRUE),
+('00000000-0000-0000-0000-000000000610', 'MASH_OUT', 'MASHING', 100, 'Mash out', 'Elevar la temperatura final de la maceración cuando la receta lo requiera.', TRUE, 'ALL', TRUE),
+('00000000-0000-0000-0000-000000000611', 'MASH_RECIRCULATION', 'MASHING', 110, 'Recirculado', 'Recircular hasta alcanzar la claridad o condición definida.', TRUE, 'ALL', TRUE),
+('00000000-0000-0000-0000-000000000612', 'LAUTERING', 'MASHING', 120, 'Filtrado del mosto', 'Separar el mosto dulce del grano y controlar el caudal.', FALSE, 'ALL', TRUE),
+('00000000-0000-0000-0000-000000000613', 'SPARGING', 'MASHING', 130, 'Lavado de grano', 'Lavar el lecho y registrar volumen y densidad de salida.', TRUE, 'ALL', TRUE),
+('00000000-0000-0000-0000-000000000614', 'KETTLE_TRANSFER', 'MASHING', 140, 'Transferir a cocción', 'Completar transferencia y verificar volumen pre-cocción.', FALSE, 'ALL', TRUE),
+('00000000-0000-0000-0000-000000000615', 'BOIL', 'BOILING', 150, 'Cocción', 'Controlar hervor, duración y evaporación.', FALSE, 'ALL', TRUE),
+('00000000-0000-0000-0000-000000000616', 'BOIL_ADDITIONS', 'BOILING', 160, 'Adiciones de cocción', 'Registrar lúpulos, azúcares, clarificantes y otras adiciones por tiempo.', FALSE, 'ALL', TRUE),
+('00000000-0000-0000-0000-000000000617', 'WHIRLPOOL', 'BOILING', 170, 'Whirlpool y reposo', 'Formar el cono, realizar adiciones tardías y permitir sedimentación.', TRUE, 'ALL', TRUE),
+('00000000-0000-0000-0000-000000000618', 'WORT_COOLING', 'COLD_SIDE', 180, 'Enfriado del mosto', 'Enfriar a temperatura de inoculación y registrar temperatura de salida.', FALSE, 'ALL', TRUE),
+('00000000-0000-0000-0000-000000000619', 'FERMENTER_TRANSFER', 'COLD_SIDE', 190, 'Transferir al fermentador', 'Transferir en condición sanitaria y medir volumen recibido.', FALSE, 'ALL', TRUE),
+('00000000-0000-0000-0000-000000000620', 'AERATION', 'COLD_SIDE', 200, 'Aireación u oxigenación', 'Aplicar aire u oxígeno según estilo, levadura y procedimiento.', TRUE, 'ALL', TRUE),
+('00000000-0000-0000-0000-000000000621', 'YEAST_PITCH', 'COLD_SIDE', 210, 'Inocular levadura', 'Registrar cepa, lote, cantidad, viabilidad y hora de inoculación.', FALSE, 'ALL', TRUE),
+('00000000-0000-0000-0000-000000000622', 'FERMENTATION', 'CELLAR', 220, 'Fermentación', 'Ejecutar el perfil térmico y seguir temperatura, gravedad y presión.', FALSE, 'ALL', TRUE),
+('00000000-0000-0000-0000-000000000623', 'DIACETYL_REST', 'CELLAR', 230, 'Descanso de diacetilo', 'Aplicar el descanso cuando el estilo o la evolución del lote lo requiera.', TRUE, 'ALL', TRUE),
+('00000000-0000-0000-0000-000000000624', 'COLD_CRASH', 'CELLAR', 240, 'Cold crash', 'Descender la temperatura para favorecer sedimentación y estabilidad.', TRUE, 'ALL', TRUE),
+('00000000-0000-0000-0000-000000000625', 'MATURATION', 'CELLAR', 250, 'Maduración', 'Mantener condiciones de maduración, guarda o lagering.', FALSE, 'ALL', TRUE),
+('00000000-0000-0000-0000-000000000626', 'CLARIFICATION', 'CELLAR', 260, 'Clarificación', 'Dosificar clarificante o ejecutar el método definido.', TRUE, 'ALL', TRUE),
+('00000000-0000-0000-0000-000000000627', 'FILTRATION', 'CELLAR', 270, 'Filtración', 'Filtrar y registrar medio, presión, caudal, turbidez y pérdidas.', TRUE, 'ALL', TRUE),
+('00000000-0000-0000-0000-000000000628', 'CARBONATION', 'CELLAR', 280, 'Carbonatación', 'Alcanzar y verificar el nivel objetivo de CO₂.', FALSE, 'ALL', TRUE),
+('00000000-0000-0000-0000-000000000629', 'PACKAGE_PREPARATION', 'PACKAGING', 290, 'Preparar envasado', 'Sanitizar línea y envases, liberar materiales y verificar presentación.', FALSE, 'ALL', TRUE),
+('00000000-0000-0000-0000-000000000630', 'KEGGING', 'PACKAGING', 300, 'Envasar en barril', 'Llenar, identificar y verificar barriles.', TRUE, 'KEG', TRUE),
+('00000000-0000-0000-0000-000000000631', 'BOTTLING', 'PACKAGING', 310, 'Envasar en botella', 'Llenar, tapar y verificar botellas.', TRUE, 'BOTTLE', TRUE),
+('00000000-0000-0000-0000-000000000632', 'CANNING', 'PACKAGING', 320, 'Envasar en lata', 'Llenar, cerrar y verificar latas.', TRUE, 'CAN', TRUE),
+('00000000-0000-0000-0000-000000000633', 'LABEL_AND_PACK', 'PACKAGING', 330, 'Etiquetar y empacar', 'Aplicar identificación, lote y empaque secundario.', FALSE, 'ALL', TRUE),
+('00000000-0000-0000-0000-000000000634', 'QUALITY_RELEASE', 'CLOSEOUT', 340, 'Liberar producto terminado', 'Validar controles de calidad y trasladar el lote a producto terminado.', FALSE, 'ALL', TRUE),
+('00000000-0000-0000-0000-000000000635', 'POST_CIP', 'CLOSEOUT', 350, 'Limpieza y cierre', 'Ejecutar limpieza posterior, registrar pérdidas, consumos y cierre del lote.', FALSE, 'ALL', TRUE);

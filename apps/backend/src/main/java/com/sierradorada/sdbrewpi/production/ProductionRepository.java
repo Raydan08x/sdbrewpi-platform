@@ -20,6 +20,13 @@ public class ProductionRepository {
             (rs, row) -> mapRecipeBase(rs)).stream().map(this::withSteps).toList();
     }
 
+    public List<ProductionStageView> findProcessStages() {
+        return jdbc.query("SELECT * FROM process_stage_definition WHERE enabled = TRUE ORDER BY step_order",
+            (rs, row) -> new ProductionStageView(rs.getString("code"), rs.getString("phase"),
+                rs.getInt("step_order"), rs.getString("name"), rs.getString("description"),
+                rs.getBoolean("optional"), rs.getString("variant")));
+    }
+
     public Optional<RecipeView> findRecipe(String id) {
         return jdbc.query("SELECT * FROM recipe_version WHERE id = ?", (rs, row) -> mapRecipeBase(rs), id)
             .stream().findFirst().map(this::withSteps);

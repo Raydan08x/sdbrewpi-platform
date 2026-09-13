@@ -1,4 +1,4 @@
-import type { ControlMode, Overview, PlantOverview, PlantProfile, ProductionOverview, Tank } from './types'
+import type { ControlMode, Overview, PlantAsset, PlantAssetInput, PlantOverview, PlantProfile, ProductionOverview, Tank } from './types'
 
 async function request<T>(url: string, init?: RequestInit): Promise<T> {
   const response = await fetch(url, { ...init, headers: { 'Content-Type': 'application/json', 'X-Actor': 'local-webapp', ...init?.headers } })
@@ -20,6 +20,19 @@ export const getPlantOverview = () => request<PlantOverview>('/api/v1/plant/over
 export const updatePlantProfile = (site: PlantProfile, values: Omit<PlantProfile, 'id' | 'code' | 'revision' | 'updatedAt'>) =>
   request<PlantProfile>('/api/v1/plant/sites/' + site.id, {
     method: 'PUT', body: JSON.stringify({ ...values, expectedRevision: site.revision })
+  })
+
+export const createPlantAsset = (siteId: string, values: PlantAssetInput) =>
+  request<PlantAsset>(`/api/v1/plant/sites/${siteId}/assets`, { method: 'POST', body: JSON.stringify(values) })
+
+export const updatePlantAsset = (asset: PlantAsset, values: PlantAssetInput) =>
+  request<PlantAsset>(`/api/v1/plant/assets/${asset.id}`, {
+    method: 'PUT', body: JSON.stringify({ ...values, expectedRevision: asset.revision })
+  })
+
+export const retirePlantAsset = (asset: PlantAsset) =>
+  request<PlantAsset>(`/api/v1/plant/assets/${asset.id}/retire`, {
+    method: 'PUT', body: JSON.stringify({ expectedRevision: asset.revision })
   })
 
 export const setMode = (tank: Tank, mode: ControlMode) => request('/api/v1/fermentation/tanks/' + tank.id + '/mode', {

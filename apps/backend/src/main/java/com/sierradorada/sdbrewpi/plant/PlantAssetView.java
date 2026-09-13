@@ -1,5 +1,7 @@
 package com.sierradorada.sdbrewpi.plant;
 
+import java.time.Instant;
+
 public record PlantAssetView(
         String id,
         String siteId,
@@ -16,4 +18,6 @@ public record PlantAssetView(
         String status,
         boolean controllable,
         String notes,
-        long revision) {}
+        long revision,
+        boolean active,
+        Instant updatedAt) {}

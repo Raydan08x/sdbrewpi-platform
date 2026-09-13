@@ -15,7 +15,8 @@ public class ProductionService {
     public ProductionService(ProductionRepository repository) { this.repository = repository; }
 
     public ProductionOverview overview() {
-        return new ProductionOverview(Instant.now(), repository.findRecipes(), repository.findActiveBatches());
+        return new ProductionOverview(Instant.now(), repository.findRecipes(), repository.findActiveBatches(),
+            repository.findProcessStages());
     }
 
     @Transactional

@@ -25,7 +25,7 @@
 
 ## M0.5 — Completar Mi Planta
 
-- [ ] Editor de equipos, sensores, capacidades y conexiones.
+- [x] Alta, edición y retiro lógico de equipos, sensores, capacidades y conexiones.
 - [ ] Modelo de circuitos, tramos y remanentes de tubería.
 - [ ] Bodegas y ubicaciones físicas de la sede.
 - [ ] Agente local para descubrir controladores compatibles por USB.
@@ -51,6 +51,17 @@
 - [ ] Ejecución temporal de fases, rampas y cambios de setpoint.
 - Batch record, eventos y adiciones.
 - Simulación determinista de fallos y recuperación.
+
+## M2.5 — Ejecución integral de producción
+
+- [x] Catálogo base de 43 etapas desde pesajes hasta producto terminado y limpieza final.
+- [x] Vista general de Producción con Fermentación como estación interna.
+- [ ] Configurar pasos opcionales y ruta de envasado por versión de receta.
+- [ ] Orden de producción con estado, responsables, tiempos y equipos por etapa.
+- [ ] Kit de pesajes ligado a reservas y lotes de inventario.
+- [ ] Registros de maceración, cocción, adiciones, enfriado y transferencias.
+- [ ] Consumos, mediciones, liberaciones de calidad y firmas de operador.
+- [ ] Envasado por barril, botella o lata y entrada automática a producto terminado.
 
 ## M3 — Banco de hardware
 

@@ -87,6 +87,17 @@ export interface ProductionOverview {
   generatedAt: string
   recipes: Recipe[]
   activeBatches: Batch[]
+  processStages: ProductionStage[]
+}
+
+export interface ProductionStage {
+  code: string
+  phase: string
+  order: number
+  name: string
+  description: string
+  optional: boolean
+  variant: string
 }
 
 export interface PlantProfile {
@@ -123,7 +134,11 @@ export interface PlantAsset {
   controllable: boolean
   notes: string
   revision: number
+  active: boolean
+  updatedAt: string
 }
+
+export type PlantAssetInput = Omit<PlantAsset, 'id' | 'siteId' | 'revision' | 'active' | 'updatedAt'>
 
 export interface PlantOverview {
   generatedAt: string
