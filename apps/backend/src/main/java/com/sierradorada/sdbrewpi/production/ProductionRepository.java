@@ -140,17 +140,27 @@ public class ProductionRepository {
 
     public void event(String id, String batchId, String eventType, Integer stepOrder, String actor, String message,
             Instant occurredAt) {
-        jdbc.update("INSERT INTO batch_event VALUES (?, ?, ?, ?, ?, ?, ?)", id, batchId, Timestamp.from(occurredAt),
-            eventType, stepOrder, actor, message);
+        event(id, batchId, eventType, stepOrder, actor, message, null, null, null, occurredAt);
+    }
+
+    public void event(String id, String batchId, String eventType, Integer stepOrder, String actor, String message,
+            String materialName, Double quantity, String unit, Instant occurredAt) {
+        jdbc.update("""
+            INSERT INTO batch_event
+                (id, batch_id, occurred_at, event_type, step_order, actor, message, material_name, quantity, unit)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, id, batchId, Timestamp.from(occurredAt), eventType, stepOrder, actor, message, materialName,
+            quantity, unit);
     }
 
     public List<BatchEventView> findEvents(String batchId) {
         return jdbc.query("""
-            SELECT id, occurred_at, event_type, step_order, actor, message
+            SELECT id, occurred_at, event_type, step_order, actor, message, material_name, quantity, unit
             FROM batch_event WHERE batch_id = ? ORDER BY occurred_at DESC
             """, (rs, row) -> new BatchEventView(rs.getString("id"), rs.getTimestamp("occurred_at").toInstant(),
                 rs.getString("event_type"), nullableInteger(rs, "step_order"), rs.getString("actor"),
-                rs.getString("message")), batchId);
+                rs.getString("message"), rs.getString("material_name"), nullableDouble(rs, "quantity"),
+                rs.getString("unit")), batchId);
     }
 
     public void audit(String id, String actor, String target, String type, String payload, String reason) {
@@ -207,6 +217,11 @@ public class ProductionRepository {
 
     private Integer nullableInteger(ResultSet rs, String column) throws SQLException {
         int value = rs.getInt(column);
+        return rs.wasNull() ? null : value;
+    }
+
+    private Double nullableDouble(ResultSet rs, String column) throws SQLException {
+        double value = rs.getDouble(column);
         return rs.wasNull() ? null : value;
     }
 }

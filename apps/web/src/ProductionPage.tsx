@@ -1,7 +1,7 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Activity, AlertTriangle, ArrowRight, CalendarClock, CircleGauge, Factory, Gauge, Layers3, ListChecks, PackageCheck, Pause, Play, Radio, RefreshCw, Scale, Signal, Snowflake } from 'lucide-react'
-import { controlProfile, getOverview, getProductionOverview, getTankHistory, setMode, setSetpoint } from './api'
-import type { Batch, ControlMode, FermentationHistory, FermentationMeasurement, Overview, ProductionOverview, ProductionStage, Tank } from './types'
+import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react'
+import { Activity, AlertTriangle, ArrowRight, CalendarClock, CheckCheck, CircleGauge, ClipboardList, Factory, Gauge, Layers3, ListChecks, PackageCheck, Pause, Play, Plus, Radio, RefreshCw, Scale, Signal, Snowflake } from 'lucide-react'
+import { acknowledgeAlarm, addBatchEvent, controlProfile, getAlarmHistory, getBatchEvents, getOverview, getProductionOverview, getTankHistory, setMode, setSetpoint } from './api'
+import type { AlarmHistory, Batch, BatchEvent, BatchEventInput, ControlMode, FermentationAlarm, FermentationHistory, FermentationMeasurement, Overview, ProductionOverview, ProductionStage, Tank } from './types'
 
 const phaseLabels: Record<string, { title: string; description: string }> = {
   PREPARATION: { title: 'Preparación', description: 'Orden, pesajes, limpieza, agua y molienda' },
@@ -11,6 +11,16 @@ const phaseLabels: Record<string, { title: string; description: string }> = {
   CELLAR: { title: 'Bodega fría', description: 'Fermentación, maduración, filtración y gas' },
   PACKAGING: { title: 'Envasado', description: 'Barril, botella o lata según la orden' },
   CLOSEOUT: { title: 'Cierre', description: 'Liberación, inventario terminado y limpieza' },
+}
+
+const eventLabels: Record<string, string> = {
+  OPERATOR_NOTE: 'Nota del operador',
+  INGREDIENT_ADDITION: 'Adición de ingrediente',
+  MEASUREMENT: 'Medición manual',
+  SAMPLE: 'Toma de muestra',
+  DEVIATION: 'Desviación',
+  QUALITY_CHECK: 'Control de calidad',
+  SANITATION: 'Limpieza o sanitización',
 }
 
 function TrendChart({ samples }: { samples: FermentationMeasurement[] }) {
@@ -81,6 +91,47 @@ function ProfileExecutionPanel({ batches, generatedAt, busy, onAction }: { batch
   })}</section>
 }
 
+function AlarmCenter({ active, history, busy, onAcknowledge }: { active: FermentationAlarm[]; history: AlarmHistory | null; busy: string; onAcknowledge: (alarm: FermentationAlarm, note: string) => Promise<void> }) {
+  const [notes, setNotes] = useState<Record<string, string>>({})
+  const recent = history?.alarms.slice(0, 8) ?? []
+  return <section className={'alarm-center ' + (active.length ? 'has-active' : '')}>
+    <div className="alarm-heading"><AlertTriangle size={19}/><div><b>{active.length ? `${active.length} alarma${active.length === 1 ? '' : 's'} activa${active.length === 1 ? '' : 's'}` : 'Sin alarmas activas'}</b><span>Reconocer confirma la revisión; la alarma solo se cierra cuando desaparece su causa.</span></div></div>
+    {active.length > 0 && <div className="alarm-list">{active.map(alarm => <article key={alarm.id} className={alarm.severity.toLowerCase()}>
+      <span>{alarm.severity === 'CRITICAL' ? 'CRÍTICA' : 'AVISO'}</span><div><b>{alarm.targetId}</b><p>{alarm.message}</p><small>{new Date(alarm.openedAt).toLocaleString('es-CO')}</small></div>
+      {alarm.acknowledgedAt ? <div className="alarm-acknowledged"><CheckCheck size={14}/><span>Revisada por {alarm.acknowledgedBy}</span></div> : <div className="alarm-actions"><input aria-label={`Nota para ${alarm.targetId}`} value={notes[alarm.id] ?? ''} maxLength={300} placeholder="Nota opcional" onChange={event => setNotes(current => ({...current, [alarm.id]: event.target.value}))}/><button disabled={busy === `alarm:${alarm.id}`} onClick={async () => { await onAcknowledge(alarm, notes[alarm.id] ?? ''); setNotes(current => ({...current, [alarm.id]: ''})) }}><CheckCheck size={13}/>Reconocer</button></div>}
+    </article>)}</div>}
+    <div className="alarm-history"><div><b>Historial reciente</b><small>Últimos 7 días</small></div>{recent.length ? <ol>{recent.map(alarm => <li key={alarm.id}><span className={alarm.status.toLowerCase()}>{alarm.status === 'OPEN' ? 'ACTIVA' : 'CERRADA'}</span><div><b>{alarm.targetId} · {alarm.code}</b><small>{alarm.acknowledgedAt ? `Revisada por ${alarm.acknowledgedBy}` : 'Sin reconocimiento'} · {new Date(alarm.openedAt).toLocaleString('es-CO')}</small></div></li>)}</ol> : <p>No hay alarmas registradas en este período.</p>}</div>
+  </section>
+}
+
+function BatchRecordPanel({ batches, events, busy, onAdd }: { batches: Batch[]; events: Record<string, BatchEvent[]>; busy: string; onAdd: (batchId: string, values: BatchEventInput) => Promise<void> }) {
+  const [selectedBatch, setSelectedBatch] = useState(batches[0]?.id ?? '')
+  const [eventType, setEventType] = useState('OPERATOR_NOTE')
+  const [message, setMessage] = useState('')
+  const [materialName, setMaterialName] = useState('')
+  const [quantity, setQuantity] = useState('')
+  const [unit, setUnit] = useState('kg')
+  if (!batches.length) return null
+  const batchId = batches.some(batch => batch.id === selectedBatch) ? selectedBatch : batches[0].id
+  const selected = batches.find(batch => batch.id === batchId)!
+  const addition = eventType === 'INGREDIENT_ADDITION'
+  const submit = async (event: FormEvent) => {
+    event.preventDefault()
+    const values: BatchEventInput = { eventType, message: message.trim() }
+    if (addition) Object.assign(values, { materialName: materialName.trim(), quantity: Number(quantity), unit: unit.trim() })
+    await onAdd(batchId, values)
+    setMessage(''); setMaterialName(''); setQuantity('')
+  }
+  return <section className="batch-record">
+    <div className="batch-record-heading"><div><ClipboardList size={19}/><span><b>Bitácora de fermentación</b><small>Eventos trazables del lote y sus adiciones</small></span></div><select aria-label="Lote de la bitácora" value={batchId} onChange={event => setSelectedBatch(event.target.value)}>{batches.map(batch => <option key={batch.id} value={batch.id}>{batch.code} · {batch.tankId}</option>)}</select></div>
+    <div className="batch-record-body"><form onSubmit={submit}><div className="event-form-row"><label>Tipo<select value={eventType} onChange={event => setEventType(event.target.value)}>{Object.entries(eventLabels).map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label><label>Fase actual<input value={`${selected.currentStep}. ${selected.profile[selected.currentStep - 1]?.name ?? 'Perfil finalizado'}`} disabled/></label></div>
+      {addition && <div className="event-form-row addition"><label>Material<input required maxLength={120} value={materialName} onChange={event => setMaterialName(event.target.value)} placeholder="Ej. Citra"/></label><label>Cantidad<input required type="number" min="0.001" step="0.001" value={quantity} onChange={event => setQuantity(event.target.value)}/></label><label>Unidad<input required maxLength={20} value={unit} onChange={event => setUnit(event.target.value)} placeholder="kg, g, L…"/></label></div>}
+      <label>Descripción<textarea required maxLength={300} value={message} onChange={event => setMessage(event.target.value)} placeholder="Qué ocurrió, resultado y observaciones"/></label><button disabled={busy === `event:${batchId}` || !message.trim()}><Plus size={14}/>Registrar evento</button></form>
+      <div className="event-timeline">{(events[batchId] ?? []).length ? <ol>{(events[batchId] ?? []).slice(0, 12).map(item => <li key={item.id}><i/><div><span>{eventLabels[item.eventType] ?? item.eventType} · fase {item.stepOrder ?? '—'}</span><b>{item.message}</b>{item.materialName && <small>{item.materialName} · {item.quantity} {item.unit}</small>}<small>{item.actor} · {new Date(item.occurredAt).toLocaleString('es-CO')}</small></div></li>)}</ol> : <div className="event-empty">Aún no hay eventos registrados para este lote.</div>}</div>
+    </div>
+  </section>
+}
+
 function ProcessMap({ stages, hasActiveBatch, onOpenFermentation }: { stages: ProductionStage[]; hasActiveBatch: boolean; onOpenFermentation: () => void }) {
   const groups = useMemo(() => {
     const grouped = new Map<string, ProductionStage[]>()
@@ -108,15 +159,22 @@ export default function ProductionPage() {
   const [overview, setOverview] = useState<Overview | null>(null)
   const [production, setProduction] = useState<ProductionOverview | null>(null)
   const [histories, setHistories] = useState<Record<string, FermentationHistory>>({})
+  const [alarmHistory, setAlarmHistory] = useState<AlarmHistory | null>(null)
+  const [batchEvents, setBatchEvents] = useState<Record<string, BatchEvent[]>>({})
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
   const [busy, setBusy] = useState('')
   const load = useCallback(async () => {
     try {
       const [nextOverview, nextProduction] = await Promise.all([getOverview(), getProductionOverview()])
-      const nextHistories = await Promise.all(nextOverview.tanks.map(tank => getTankHistory(tank.id)))
+      const [nextHistories, nextAlarmHistory, nextEventLists] = await Promise.all([
+        Promise.all(nextOverview.tanks.map(tank => getTankHistory(tank.id))),
+        getAlarmHistory(),
+        Promise.all(nextProduction.activeBatches.map(async batch => [batch.id, await getBatchEvents(batch.id)] as const)),
+      ])
       setOverview(nextOverview); setProduction(nextProduction)
-      setHistories(Object.fromEntries(nextHistories.map(history => [history.tankId, history]))); setError('')
+      setHistories(Object.fromEntries(nextHistories.map(history => [history.tankId, history])))
+      setAlarmHistory(nextAlarmHistory); setBatchEvents(Object.fromEntries(nextEventLists)); setError('')
     } catch (caught) { setError(caught instanceof Error ? caught.message : 'API no disponible') }
   }, [])
   useEffect(() => {
@@ -125,9 +183,9 @@ export default function ProductionPage() {
     return () => { window.clearTimeout(initial); if (interval) window.clearInterval(interval) }
   }, [load, section])
 
-  const command = async (id: string, action: () => Promise<unknown>) => {
+  const command = async (id: string, action: () => Promise<unknown>, successMessage = 'Cambio guardado; las salidas físicas siguen deshabilitadas') => {
     setBusy(id); setNotice('')
-    try { await action(); setNotice('Cambio guardado; las salidas físicas siguen deshabilitadas'); await load() }
+    try { await action(); setNotice(successMessage); await load() }
     catch (caught) { setError(caught instanceof Error ? caught.message : 'Error enviando orden') }
     finally { setBusy('') }
   }
@@ -149,8 +207,9 @@ export default function ProductionPage() {
     </> : <>
       <div className="simulation-banner"><AlertTriangle size={20}/><div><b>{overview.environment === 'PLC_DEMO_READ_ONLY' ? 'PLC demo habilitado en modo de solo lectura' : overview.environment === 'LIVE_READ_ONLY' ? 'Telemetría real en modo de solo lectura' : 'Entorno de simulación'}</b><span>Ninguna salida física está habilitada.</span></div></div>
       <section className="source-grid"><div className={'telemetry-state ' + (overview.plcDemo.connected ? 'online' : overview.plcDemo.enabled ? 'waiting' : 'disabled')}><Radio size={18}/><div><b>PLC demo · {overview.plcDemo.port}</b><span>{overview.plcDemo.detail}</span></div><small>{overview.plcDemo.acceptedMessages} muestras · {overview.plcDemo.rejectedLines} rechazadas</small></div><div className={'telemetry-state ' + (overview.telemetry.connected ? 'online' : overview.telemetry.enabled ? 'waiting' : 'disabled')}><Radio size={18}/><div><b>MQTT · Pills</b><span>{overview.telemetry.detail}</span></div><small>{overview.telemetry.acceptedMessages} aceptados · {overview.telemetry.rejectedMessages} rechazados</small></div></section>
-      {overview.alarms.length > 0 && <section className="alarm-panel"><div className="alarm-heading"><AlertTriangle size={19}/><div><b>{overview.alarms.length} alarma{overview.alarms.length === 1 ? '' : 's'} activa{overview.alarms.length === 1 ? '' : 's'}</b><span>Persisten hasta que la condición deje de existir.</span></div></div><div className="alarm-list">{overview.alarms.map(alarm => <article key={alarm.id} className={alarm.severity.toLowerCase()}><span>{alarm.severity === 'CRITICAL' ? 'CRÍTICA' : 'AVISO'}</span><div><b>{alarm.targetId}</b><p>{alarm.message}</p></div><small>{new Date(alarm.openedAt).toLocaleString('es-CO')}</small></article>)}</div></section>}
+      <AlarmCenter active={overview.alarms} history={alarmHistory} busy={busy} onAcknowledge={(alarm, note) => command(`alarm:${alarm.id}`, () => acknowledgeAlarm(alarm, note), 'Alarma reconocida y registrada en la trazabilidad')}/>
       <ProfileExecutionPanel batches={production.activeBatches} generatedAt={overview.generatedAt} busy={busy} onAction={(batch, action) => command(batch.id, () => controlProfile(batch.id, action, batch.revision))}/>
+      <BatchRecordPanel batches={production.activeBatches} events={batchEvents} busy={busy} onAdd={(batchId, values) => command(`event:${batchId}`, () => addBatchEvent(batchId, values), 'Evento agregado a la bitácora del lote')}/>
       <section className="metrics"><div><span><Activity size={18}/>Tanques activos</span><b>{overview.tanks.filter(t => t.mode !== 'OFF').length}<small>/ {overview.tanks.length}</small></b></div><div><span><Snowflake size={18}/>Demandas de frío</span><b>{overview.tanks.filter(t => t.coolingDemand).length}</b></div><div><span><Gauge size={18}/>Bomba</span><b className={overview.chiller.pumpOn ? 'cyan' : ''}>{overview.chiller.pumpOn ? 'ON' : 'OFF'}</b></div><div><span><CircleGauge size={18}/>Depósito</span><b className="muted">Sin sensor</b></div></section>
       <section className="section-title"><div><span className="line"/><h3>FERMENTADORES</h3></div><small>Actualizado {new Date(overview.generatedAt).toLocaleTimeString('es-CO')}</small></section>
       <section className="tank-grid">{overview.tanks.map(tank => <TankCard key={`${tank.id}-${tank.setpointC}`} tank={tank} batch={production.activeBatches.find(batch => batch.tankId === tank.id)} history={histories[tank.id]} busy={busy === tank.id} onMode={(t,m) => command(t.id, () => setMode(t,m))} onSetpoint={(t,v) => command(t.id, () => setSetpoint(t,v))}/>)}</section>

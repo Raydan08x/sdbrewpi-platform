@@ -66,4 +66,12 @@ public class ProductionController {
 
     @GetMapping("/batches/{id}/events")
     List<BatchEventView> events(@PathVariable String id) { return service.events(id); }
+
+    @PostMapping("/batches/{id}/events")
+    ResponseEntity<BatchEventView> addEvent(@PathVariable String id, @Valid @RequestBody BatchEventRequest request,
+            @RequestHeader(value = "X-Actor", required = false) String actor) {
+        BatchEventView created = service.addEvent(id, request, actor);
+        return ResponseEntity.created(URI.create("/api/v1/production/batches/" + id + "/events/" + created.id()))
+            .body(created);
+    }
 }

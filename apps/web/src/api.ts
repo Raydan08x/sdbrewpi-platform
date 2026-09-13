@@ -1,4 +1,4 @@
-import type { ControlMode, FermentationHistory, Overview, PlantAsset, PlantAssetInput, PlantOverview, PlantProfile, PlantStorageLocation, PlantStorageLocationInput, PlantWarehouse, PlantWarehouseInput, ProductionOverview, Tank } from './types'
+import type { AlarmHistory, BatchEvent, BatchEventInput, ControlMode, FermentationAlarm, FermentationHistory, Overview, PlantAsset, PlantAssetInput, PlantOverview, PlantProfile, PlantStorageLocation, PlantStorageLocationInput, PlantWarehouse, PlantWarehouseInput, ProductionOverview, Tank } from './types'
 
 async function request<T>(url: string, init?: RequestInit): Promise<T> {
   const response = await fetch(url, { ...init, headers: { 'Content-Type': 'application/json', 'X-Actor': 'local-webapp', ...init?.headers } })
@@ -15,6 +15,7 @@ async function request<T>(url: string, init?: RequestInit): Promise<T> {
 
 export const getOverview = () => request<Overview>('/api/v1/fermentation/overview')
 export const getTankHistory = (tankId: string) => request<FermentationHistory>(`/api/v1/fermentation/tanks/${tankId}/history?hours=24&limit=720`)
+export const getAlarmHistory = () => request<AlarmHistory>('/api/v1/fermentation/alarms?hours=168&limit=200')
 export const getProductionOverview = () => request<ProductionOverview>('/api/v1/production/overview')
 export const getPlantOverview = () => request<PlantOverview>('/api/v1/plant/overview')
 
@@ -77,4 +78,17 @@ export const setSetpoint = (tank: Tank, setpointC: number) => request('/api/v1/f
 export const controlProfile = (batchId: string, action: 'start' | 'pause' | 'resume', expectedRevision: number) =>
   request(`/api/v1/production/batches/${batchId}/profile/${action}`, {
     method: 'PUT', body: JSON.stringify({ expectedRevision })
+  })
+
+export const acknowledgeAlarm = (alarm: FermentationAlarm, note: string) =>
+  request<FermentationAlarm>(`/api/v1/fermentation/alarms/${alarm.id}/acknowledge`, {
+    method: 'PUT', body: JSON.stringify({ expectedRevision: alarm.revision, note })
+  })
+
+export const getBatchEvents = (batchId: string) =>
+  request<BatchEvent[]>(`/api/v1/production/batches/${batchId}/events`)
+
+export const addBatchEvent = (batchId: string, values: BatchEventInput) =>
+  request<BatchEvent>(`/api/v1/production/batches/${batchId}/events`, {
+    method: 'POST', body: JSON.stringify(values)
   })

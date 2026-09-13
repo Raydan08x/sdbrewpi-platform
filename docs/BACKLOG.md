@@ -51,7 +51,9 @@
 - [x] Ejecución temporal de fases, pausa/reanudación y cambios de setpoint.
 - [ ] Rampas térmicas configurables entre fases.
 - [x] Eventos básicos de perfil en el batch record.
-- [ ] Registro de adiciones, observaciones, mediciones manuales y firmas.
+- [x] Bitácora de adiciones estructuradas, observaciones, mediciones manuales y eventos operativos.
+- [ ] Firma de operador ligada a autenticación y roles.
+- [x] Reconocimiento e historial de alarmas con operador, hora y nota.
 - Simulación determinista de fallos y recuperación.
 
 ## M2.5 — Ejecución integral de producción

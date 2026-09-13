@@ -8,5 +8,8 @@ public record BatchEventView(
     String eventType,
     Integer stepOrder,
     String actor,
-    String message
+    String message,
+    String materialName,
+    Double quantity,
+    String unit
 ) {}

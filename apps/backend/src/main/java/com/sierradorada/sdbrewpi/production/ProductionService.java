@@ -7,6 +7,7 @@ import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.Locale;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
@@ -14,6 +15,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Service
 public class ProductionService {
+    private static final Set<String> MANUAL_EVENT_TYPES = Set.of(
+        "OPERATOR_NOTE", "INGREDIENT_ADDITION", "MEASUREMENT", "SAMPLE", "DEVIATION", "QUALITY_CHECK", "SANITATION"
+    );
     private final ProductionRepository repository;
     private final FermentationRepository fermentationRepository;
 
@@ -128,6 +132,37 @@ public class ProductionService {
         return repository.findEvents(id);
     }
 
+    @Transactional
+    public BatchEventView addEvent(String id, BatchEventRequest request, String actor) {
+        BatchView batch = activeBatch(id);
+        String eventType = request.eventType().trim().toUpperCase(Locale.ROOT);
+        if (!MANUAL_EVENT_TYPES.contains(eventType)) throw new IllegalArgumentException("El tipo de evento no es válido");
+        int stepOrder = request.stepOrder() == null ? batch.currentStep() : request.stepOrder();
+        if (stepOrder > batch.profile().size()) throw new IllegalArgumentException("La fase no pertenece al perfil del lote");
+
+        String material = blankToNull(request.materialName());
+        String unit = blankToNull(request.unit());
+        Double quantity = request.quantity();
+        if ("INGREDIENT_ADDITION".equals(eventType)
+                && (material == null || unit == null || quantity == null || quantity <= 0)) {
+            throw new IllegalArgumentException("Una adición requiere material, cantidad y unidad");
+        }
+        if (!"INGREDIENT_ADDITION".equals(eventType)) {
+            material = null;
+            unit = null;
+            quantity = null;
+        }
+
+        String eventId = UUID.randomUUID().toString();
+        Instant now = Instant.now();
+        String safeActor = safeActor(actor);
+        String message = request.message().trim();
+        repository.event(eventId, id, eventType, stepOrder, safeActor, message, material, quantity, unit, now);
+        repository.audit(UUID.randomUUID().toString(), safeActor, id, "RECORD_BATCH_EVENT", eventType,
+            "Evento operativo registrado en el lote");
+        return new BatchEventView(eventId, now, eventType, stepOrder, safeActor, message, material, quantity, unit);
+    }
+
     @Scheduled(fixedDelay = 5000)
     @Transactional
     public void advanceProfiles() {
@@ -189,6 +224,11 @@ public class ProductionService {
     }
 
     private String safeNotes(String value) { return value == null ? "" : value.trim(); }
+
+    private String blankToNull(String value) {
+        if (value == null || value.isBlank()) return null;
+        return value.trim();
+    }
 
     private String safeActor(String actor) {
         if (actor == null || actor.isBlank()) return "local-webapp";

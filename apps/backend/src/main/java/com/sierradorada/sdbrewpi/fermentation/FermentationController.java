@@ -31,6 +31,18 @@ public class FermentationController {
         return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(service.history(id, hours, limit));
     }
 
+    @GetMapping("/alarms")
+    ResponseEntity<AlarmHistoryView> alarmHistory(@RequestParam(defaultValue = "168") int hours,
+            @RequestParam(defaultValue = "200") int limit) {
+        return ResponseEntity.ok().cacheControl(CacheControl.noStore()).body(service.alarmHistory(hours, limit));
+    }
+
+    @PutMapping("/alarms/{id}/acknowledge")
+    AlarmView acknowledgeAlarm(@PathVariable String id, @Valid @RequestBody AlarmAcknowledgementRequest request,
+            @RequestHeader(value = "X-Actor", required = false) String actor) {
+        return service.acknowledgeAlarm(id, request, actor);
+    }
+
     @PutMapping("/tanks/{id}/setpoint")
     CommandResult setpoint(@PathVariable String id, @Valid @RequestBody SetpointRequest request,
             @RequestHeader(value = "X-Actor", required = false) String actor) {

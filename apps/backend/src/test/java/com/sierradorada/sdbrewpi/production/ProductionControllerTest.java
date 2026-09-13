@@ -144,6 +144,38 @@ class ProductionControllerTest {
     }
 
     @Test
+    void recordsStructuredIngredientAdditionInBatchLog() throws Exception {
+        String batchId = "00000000-0000-0000-0000-000000000301";
+        mvc.perform(post("/api/v1/production/batches/" + batchId + "/events")
+                .header("X-Actor", "qa-cellar")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {"eventType":"INGREDIENT_ADDITION","message":"Adición de lúpulo en fermentación",
+                     "materialName":"Citra","quantity":0.75,"unit":"kg"}
+                    """))
+            .andExpect(status().isCreated())
+            .andExpect(jsonPath("$.eventType").value("INGREDIENT_ADDITION"))
+            .andExpect(jsonPath("$.stepOrder").value(1))
+            .andExpect(jsonPath("$.actor").value("qa-cellar"))
+            .andExpect(jsonPath("$.materialName").value("Citra"))
+            .andExpect(jsonPath("$.quantity").value(0.75))
+            .andExpect(jsonPath("$.unit").value("kg"));
+
+        mvc.perform(get("/api/v1/production/batches/" + batchId + "/events"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$[0].materialName").value("Citra"));
+    }
+
+    @Test
+    void rejectsIncompleteIngredientAddition() throws Exception {
+        mvc.perform(post("/api/v1/production/batches/00000000-0000-0000-0000-000000000301/events")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"eventType\":\"INGREDIENT_ADDITION\",\"message\":\"Adición incompleta\"}"))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.message").value("Una adición requiere material, cantidad y unidad"));
+    }
+
+    @Test
     void advancesOverdueProfileStepAndUpdatesSetpoint() throws Exception {
         String batchId = "00000000-0000-0000-0000-000000000301";
         jdbc.update("UPDATE production_batch SET profile_state = 'RUNNING', step_started_at = ?, revision = 1 WHERE id = ?",

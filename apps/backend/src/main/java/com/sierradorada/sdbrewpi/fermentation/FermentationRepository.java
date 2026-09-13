@@ -122,6 +122,25 @@ public class FermentationRepository {
             """, (rs, row) -> mapAlarm(rs));
     }
 
+    public Optional<AlarmView> findAlarm(String id) {
+        return jdbc.query("SELECT * FROM fermentation_alarm WHERE id = ?", (rs, row) -> mapAlarm(rs), id)
+            .stream().findFirst();
+    }
+
+    public List<AlarmView> findAlarms(Instant from, int limit) {
+        return jdbc.query("""
+            SELECT * FROM fermentation_alarm WHERE opened_at >= ? ORDER BY opened_at DESC LIMIT ?
+            """, (rs, row) -> mapAlarm(rs), Timestamp.from(from), limit);
+    }
+
+    public int acknowledgeAlarm(String id, long expectedRevision, String actor, String note, Instant now) {
+        return jdbc.update("""
+            UPDATE fermentation_alarm
+            SET acknowledged_at = ?, acknowledged_by = ?, acknowledgment_note = ?, revision = revision + 1
+            WHERE id = ? AND status = 'OPEN' AND acknowledged_at IS NULL AND revision = ?
+            """, Timestamp.from(now), actor, note, id, expectedRevision);
+    }
+
     public void reconcileAlarm(String alarmKey, String targetId, String code, String severity, String message,
             String source, boolean active, Instant now) {
         List<String> openIds = jdbc.query("SELECT id FROM fermentation_alarm WHERE alarm_key = ? AND status = 'OPEN'",
@@ -177,6 +196,7 @@ public class FermentationRepository {
         return new AlarmView(rs.getString("id"), rs.getString("target_id"), rs.getString("code"),
             rs.getString("severity"), rs.getString("status"), rs.getString("message"), rs.getString("source"),
             rs.getTimestamp("opened_at").toInstant(), rs.getTimestamp("last_seen_at").toInstant(),
-            nullableInstant(rs, "cleared_at"));
+            nullableInstant(rs, "cleared_at"), nullableInstant(rs, "acknowledged_at"),
+            rs.getString("acknowledged_by"), rs.getString("acknowledgment_note"), rs.getLong("revision"));
     }
 }

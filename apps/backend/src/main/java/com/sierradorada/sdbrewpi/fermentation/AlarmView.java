@@ -12,5 +12,9 @@ public record AlarmView(
     String source,
     Instant openedAt,
     Instant lastSeenAt,
-    Instant clearedAt
+    Instant clearedAt,
+    Instant acknowledgedAt,
+    String acknowledgedBy,
+    String acknowledgmentNote,
+    long revision
 ) {}

@@ -66,6 +66,16 @@ export interface FermentationAlarm {
   openedAt: string
   lastSeenAt: string
   clearedAt: string | null
+  acknowledgedAt: string | null
+  acknowledgedBy: string | null
+  acknowledgmentNote: string | null
+  revision: number
+}
+
+export interface AlarmHistory {
+  from: string
+  generatedAt: string
+  alarms: FermentationAlarm[]
 }
 
 export interface FermentationMeasurement {
@@ -125,6 +135,26 @@ export interface Batch {
   completedAt: string | null
   revision: number
   profile: ProfileStep[]
+}
+
+export interface BatchEvent {
+  id: string
+  occurredAt: string
+  eventType: string
+  stepOrder: number | null
+  actor: string
+  message: string
+  materialName: string | null
+  quantity: number | null
+  unit: string | null
+}
+
+export interface BatchEventInput {
+  eventType: string
+  message: string
+  materialName?: string
+  quantity?: number
+  unit?: string
 }
 
 export interface ProductionOverview {

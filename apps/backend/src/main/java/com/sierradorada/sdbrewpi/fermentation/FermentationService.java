@@ -56,6 +56,30 @@ public class FermentationService {
         return new FermentationHistoryView(id, from, Instant.now(), samples.reversed());
     }
 
+    public AlarmHistoryView alarmHistory(int hours, int limit) {
+        int safeHours = Math.max(1, Math.min(hours, 24 * 90));
+        int safeLimit = Math.max(1, Math.min(limit, 1000));
+        Instant from = Instant.now().minus(Duration.ofHours(safeHours));
+        return new AlarmHistoryView(from, Instant.now(), repository.findAlarms(from, safeLimit));
+    }
+
+    @Transactional
+    public AlarmView acknowledgeAlarm(String id, AlarmAcknowledgementRequest request, String actor) {
+        AlarmView alarm = repository.findAlarm(id)
+            .orElseThrow(() -> new IllegalArgumentException("La alarma no existe"));
+        if (!"OPEN".equals(alarm.status())) throw new IllegalStateException("La alarma ya no está activa");
+        if (alarm.acknowledgedAt() != null) throw new IllegalStateException("La alarma ya fue reconocida");
+        String safeActor = safeActor(actor);
+        String note = request.note() == null ? "" : request.note().trim();
+        Instant now = Instant.now();
+        if (repository.acknowledgeAlarm(id, request.expectedRevision(), safeActor, note, now) == 0) {
+            throw new RevisionConflictException();
+        }
+        repository.audit(UUID.randomUUID().toString(), safeActor, id, "ACKNOWLEDGE_ALARM", alarm.code(),
+            "ACCEPTED", "Alarma reconocida por el operador");
+        return repository.findAlarm(id).orElseThrow();
+    }
+
     @Transactional
     public CommandResult setpoint(String id, SetpointRequest request, String actor) {
         tank(id);
