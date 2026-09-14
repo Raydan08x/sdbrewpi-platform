@@ -12,6 +12,8 @@
 - El orden funcional acordado es Mi Planta, Inventarios, Recetas, Planeación MRP, Producción, Compras, Ventas y CRM, y Finanzas.
 - Fermentación pertenece a Producción. Inventarios antecede a Recetas para aportar artículos, unidades, lotes y costos.
 - SDBrewPi conservará la operación y el costo industrial; la contabilidad fiscal se integrará por adaptadores con Alegra o Siigo, todavía sin proveedor elegido.
+- El lote maestro se genera al liberar la orden con `PRODUCTO-AAMM-CLASE+SECUENCIA`: `CERV-2609-L001`, `CERV-2609-P001` o `CERV-2609-T001`. `HSEL` queda reservado para hard seltzer. La secuencia es independiente por producto, mes y clase.
+- Las corridas de envasado serán hijas del lote (`-K01` barriles, `-B01` botellas, `-C01` latas). El número del barril no forma parte de la corrida: cada recipiente tendrá un identificador permanente `BRL-001`, `BRL-002`, etc., asociado dentro del batch record. Se descartó el formato `K101` porque no escala al superar diez barriles.
 
 ## Hardware identificado
 
@@ -40,4 +42,4 @@
 - Los perfiles de fermentación se pueden iniciar, pausar y reanudar; un planificador avanza fases por tiempo, aplica rampas configurables en °C/h, actualiza el setpoint y registra eventos. Mientras está en marcha, el perfil bloquea comandos manuales; la pausa deja el tanque en `MANUAL` y la reanudación recupera `AUTO` y la rampa. Al cerrar el lote, el control vuelve a `OFF`.
 - La bitácora de fermentación acepta notas, mediciones, muestras, desviaciones, controles de calidad, sanitización y adiciones estructuradas. Las alarmas conservan historial y reconocimiento con operador, hora y nota. Falta la firma ligada a autenticación.
 - La carpeta del propietario llamada `intento interfaz lvgl` es referencia de solo lectura: no editar, formatear, compilar ni cargar su contenido. Todavía no era visible dentro de `C:\Carlos` al revisar el 2026-09-13.
-- La WebApp de Fermentación permite asignar lotes a tanques libres y cerrar lotes con confirmación por código y revisión optimista. El alta no arranca el perfil; el cierre deja el tanque en OFF. Falta consulta web de lotes cerrados.
+- Producción libera la orden, asigna el código maestro y abre el batch record. Fermentación solo recibe lotes marcados como fabricados/listos y captura un snapshot del fermentador, Pill, fuente, volumen real, operador y fecha. Fermentación no crea ni cierra el lote maestro. Falta consulta web de lotes cerrados y el workflow de corridas de envasado/recipientes.

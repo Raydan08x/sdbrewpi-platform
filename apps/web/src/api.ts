@@ -1,4 +1,4 @@
-import type { AlarmHistory, BatchEvent, BatchEventInput, ControlMode, FermentationAlarm, FermentationHistory, Overview, PlantAsset, PlantAssetInput, PlantOverview, PlantProfile, PlantStorageLocation, PlantStorageLocationInput, PlantWarehouse, PlantWarehouseInput, ProductionOverview, Tank } from './types'
+import type { AlarmHistory, Batch, BatchEvent, BatchEventInput, ControlMode, FermentationAlarm, FermentationHistory, Overview, PlantAsset, PlantAssetInput, PlantOverview, PlantProfile, PlantStorageLocation, PlantStorageLocationInput, PlantWarehouse, PlantWarehouseInput, ProductionOverview, Tank } from './types'
 
 async function request<T>(url: string, init?: RequestInit): Promise<T> {
   const response = await fetch(url, { ...init, headers: { 'Content-Type': 'application/json', 'X-Actor': 'local-webapp', ...init?.headers } })
@@ -92,10 +92,20 @@ export const addBatchEvent = (batchId: string, values: BatchEventInput) =>
   request<BatchEvent>(`/api/v1/production/batches/${batchId}/events`, {
     method: 'POST', body: JSON.stringify(values)
   })
-export const createBatch = (values: { code: string; recipeVersionId: string; tankId: string; volumeL: number }) =>
-  request('/api/v1/production/batches', { method: 'POST', body: JSON.stringify(values) })
-
 export const completeBatch = (batch: { id: string; revision: number }) =>
   request(`/api/v1/production/batches/${batch.id}/complete`, {
     method: 'PUT', body: JSON.stringify({ expectedRevision: batch.revision })
+  })
+
+export const releaseProductionOrder = (values: { recipeVersionId: string; plannedVolumeL: number; batchKind: 'TEST' | 'PILOT' | 'COMMERCIAL'; productCode: 'CERV' | 'HSEL' }) =>
+  request<Batch>('/api/v1/production/orders/release', { method: 'POST', body: JSON.stringify(values) })
+
+export const markReadyForFermentation = (batch: Batch) =>
+  request<Batch>(`/api/v1/production/batches/${batch.id}/ready-for-fermentation`, {
+    method: 'PUT', body: JSON.stringify({ expectedRevision: batch.revision })
+  })
+
+export const assignFermentation = (batch: Batch, tankId: string, transferredVolumeL: number) =>
+  request<Batch>(`/api/v1/production/batches/${batch.id}/fermentation-assignment`, {
+    method: 'PUT', body: JSON.stringify({ tankId, transferredVolumeL, expectedRevision: batch.revision })
   })

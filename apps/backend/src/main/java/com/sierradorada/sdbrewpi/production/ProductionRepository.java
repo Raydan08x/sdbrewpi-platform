@@ -62,32 +62,44 @@ public class ProductionRepository {
 
     public boolean hasActiveBatch(String tankId) {
         Integer count = jdbc.queryForObject(
-            "SELECT COUNT(*) FROM production_batch WHERE tank_id = ? AND status = 'ACTIVE'", Integer.class, tankId);
+            "SELECT COUNT(*) FROM production_batch WHERE tank_id = ? AND status = 'FERMENTING'", Integer.class, tankId);
         return count != null && count > 0;
     }
 
-    public boolean batchCodeExists(String code) {
-        Integer count = jdbc.queryForObject("SELECT COUNT(*) FROM production_batch WHERE code = ?", Integer.class, code);
-        return count != null && count > 0;
+    public int nextLotNumber(String period, String productCode, String batchKind) {
+        List<Integer> values = jdbc.query("SELECT next_number FROM lot_number_counter WHERE lot_period = ? AND product_code = ? AND batch_kind = ? FOR UPDATE",
+            (rs, row) -> rs.getInt(1), period, productCode, batchKind);
+        if (values.isEmpty()) {
+            jdbc.update("INSERT INTO lot_number_counter (lot_period, product_code, batch_kind, next_number) VALUES (?, ?, ?, 2)", period, productCode, batchKind);
+            return 1;
+        }
+        int current = values.getFirst();
+        jdbc.update("UPDATE lot_number_counter SET next_number = ? WHERE lot_period = ? AND product_code = ? AND batch_kind = ?",
+            current + 1, period, productCode, batchKind);
+        return current;
     }
 
-    public void insertBatch(String id, String code, RecipeView recipe, String tankId, double volumeL,
-            Instant startedAt, Instant expectedCompleteAt) {
-        jdbc.update("INSERT INTO production_batch (id, code, recipe_version_id, recipe_code_snapshot, "
-            + "recipe_name_snapshot, recipe_version_snapshot, tank_id, volume_l, status, current_step, started_at, "
-            + "expected_complete_at, completed_at, revision, active_slot) "
-            + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'ACTIVE', 1, ?, ?, NULL, 0, 1)",
-            id, code, recipe.id(), recipe.code(), recipe.name(), recipe.version(), tankId, volumeL,
-            Timestamp.from(startedAt), Timestamp.from(expectedCompleteAt));
+    public void insertReleasedOrder(String id, String code, RecipeView recipe, double volumeL,
+            Instant openedAt, Instant expectedCompleteAt, String actor, String batchKind, String productCode,
+            String productName) {
+        jdbc.update("""
+            INSERT INTO production_batch
+              (id, code, recipe_version_id, recipe_code_snapshot, recipe_name_snapshot, recipe_version_snapshot,
+               tank_id, volume_l, status, current_step, started_at, expected_complete_at, completed_at, revision,
+               active_slot, profile_state, batch_record_opened_at, released_by, batch_kind, product_code, product_name)
+            VALUES (?, ?, ?, ?, ?, ?, NULL, ?, 'RELEASED', 1, ?, ?, NULL, 0, NULL, 'NOT_STARTED', ?, ?, ?, ?, ?)
+            """, id, code, recipe.id(), recipe.code(), recipe.name(), recipe.version(), volumeL,
+            Timestamp.from(openedAt), Timestamp.from(expectedCompleteAt), Timestamp.from(openedAt), actor, batchKind,
+            productCode, productName);
     }
 
     public List<BatchView> findActiveBatches() {
-        return jdbc.query("SELECT * FROM production_batch WHERE status = 'ACTIVE' ORDER BY started_at, code",
+        return jdbc.query("SELECT * FROM production_batch WHERE status NOT IN ('COMPLETED', 'CANCELLED') ORDER BY started_at, code",
             (rs, row) -> mapBatchBase(rs)).stream().map(this::withProfile).toList();
     }
 
     public List<BatchView> findRunningProfiles() {
-        return jdbc.query("SELECT * FROM production_batch WHERE status = 'ACTIVE' AND profile_state = 'RUNNING' ORDER BY started_at",
+        return jdbc.query("SELECT * FROM production_batch WHERE status = 'FERMENTING' AND profile_state = 'RUNNING' ORDER BY started_at",
             (rs, row) -> mapBatchBase(rs)).stream().map(this::withProfile).toList();
     }
 
@@ -100,29 +112,44 @@ public class ProductionRepository {
         return jdbc.update("UPDATE production_batch SET status = 'COMPLETED', profile_state = 'COMPLETED', "
             + "profile_completed_at = COALESCE(profile_completed_at, ?), completed_at = ?, active_slot = NULL, "
             + "revision = revision + 1 "
-            + "WHERE id = ? AND status = 'ACTIVE' AND revision = ?", Timestamp.from(completedAt),
+            + "WHERE id = ? AND status NOT IN ('COMPLETED', 'CANCELLED') AND revision = ?", Timestamp.from(completedAt),
             Timestamp.from(completedAt), id, expectedRevision);
+    }
+
+    public int readyForFermentation(String id, long expectedRevision) {
+        return jdbc.update("UPDATE production_batch SET status = 'READY_FOR_FERMENTATION', revision = revision + 1 "
+            + "WHERE id = ? AND status = 'RELEASED' AND revision = ?", id, expectedRevision);
+    }
+
+    public int assignFermentation(String id, String tankId, String tankName, String pillId, String pillSource,
+            double volumeL, Instant assignedAt, String actor, long expectedRevision) {
+        return jdbc.update("""
+            UPDATE production_batch SET status = 'FERMENTING', tank_id = ?, active_slot = 1,
+                tank_name_snapshot = ?, pill_id_snapshot = ?, pill_source_snapshot = ?, fermentation_volume_l = ?,
+                fermentation_assigned_at = ?, fermentation_assigned_by = ?, revision = revision + 1
+            WHERE id = ? AND status = 'READY_FOR_FERMENTATION' AND revision = ?
+            """, tankId, tankName, pillId, pillSource, volumeL, Timestamp.from(assignedAt), actor, id, expectedRevision);
     }
 
     public int startProfile(String id, long expectedRevision, Instant now) {
         return jdbc.update("""
             UPDATE production_batch SET profile_state = 'RUNNING', current_step = 1, step_started_at = ?,
                 step_elapsed_seconds = 0, revision = revision + 1
-            WHERE id = ? AND status = 'ACTIVE' AND profile_state = 'NOT_STARTED' AND revision = ?
+            WHERE id = ? AND status = 'FERMENTING' AND profile_state = 'NOT_STARTED' AND revision = ?
             """, Timestamp.from(now), id, expectedRevision);
     }
 
     public int pauseProfile(String id, long expectedRevision, long elapsedSeconds) {
         return jdbc.update("""
             UPDATE production_batch SET profile_state = 'PAUSED', step_elapsed_seconds = ?, revision = revision + 1
-            WHERE id = ? AND status = 'ACTIVE' AND profile_state = 'RUNNING' AND revision = ?
+            WHERE id = ? AND status = 'FERMENTING' AND profile_state = 'RUNNING' AND revision = ?
             """, elapsedSeconds, id, expectedRevision);
     }
 
     public int resumeProfile(String id, long expectedRevision, Instant reconstructedStepStart) {
         return jdbc.update("""
             UPDATE production_batch SET profile_state = 'RUNNING', step_started_at = ?, revision = revision + 1
-            WHERE id = ? AND status = 'ACTIVE' AND profile_state = 'PAUSED' AND revision = ?
+            WHERE id = ? AND status = 'FERMENTING' AND profile_state = 'PAUSED' AND revision = ?
             """, Timestamp.from(reconstructedStepStart), id, expectedRevision);
     }
 
@@ -130,7 +157,7 @@ public class ProductionRepository {
         return jdbc.update("""
             UPDATE production_batch SET current_step = ?, step_started_at = ?, step_elapsed_seconds = 0,
                 revision = revision + 1
-            WHERE id = ? AND status = 'ACTIVE' AND profile_state = 'RUNNING' AND revision = ?
+            WHERE id = ? AND status = 'FERMENTING' AND profile_state = 'RUNNING' AND revision = ?
             """, nextStep, Timestamp.from(nextStartedAt), id, expectedRevision);
     }
 
@@ -138,7 +165,7 @@ public class ProductionRepository {
         return jdbc.update("""
             UPDATE production_batch SET profile_state = 'COMPLETED', profile_completed_at = ?,
                 step_elapsed_seconds = 0, revision = revision + 1
-            WHERE id = ? AND status = 'ACTIVE' AND profile_state = 'RUNNING' AND revision = ?
+            WHERE id = ? AND status = 'FERMENTING' AND profile_state = 'RUNNING' AND revision = ?
             """, Timestamp.from(completedAt), id, expectedRevision);
     }
 
@@ -193,7 +220,11 @@ public class ProductionRepository {
             nullableInstant(rs, "step_started_at"), null, rs.getLong("step_elapsed_seconds"),
             nullableInstant(rs, "profile_completed_at"), rs.getTimestamp("started_at").toInstant(),
             rs.getTimestamp("expected_complete_at").toInstant(), nullableInstant(rs, "completed_at"),
-            rs.getLong("revision"), List.of());
+            rs.getLong("revision"), nullableInstant(rs, "batch_record_opened_at"), rs.getString("released_by"),
+            rs.getString("tank_name_snapshot"), rs.getString("pill_id_snapshot"), rs.getString("pill_source_snapshot"),
+            nullableDouble(rs, "fermentation_volume_l"), nullableInstant(rs, "fermentation_assigned_at"),
+            rs.getString("fermentation_assigned_by"), rs.getString("batch_kind"), rs.getString("product_code"),
+            rs.getString("product_name"), List.of());
     }
 
     private BatchView withProfile(BatchView batch) {
@@ -205,7 +236,10 @@ public class ProductionRepository {
         return new BatchView(batch.id(), batch.code(), batch.recipeVersionId(), batch.recipeCode(), batch.recipeName(),
             batch.recipeVersion(), batch.tankId(), batch.volumeL(), batch.status(), batch.currentStep(), batch.profileState(),
             batch.stepStartedAt(), expectedStepEnd, batch.stepElapsedSeconds(), batch.profileCompletedAt(), batch.startedAt(),
-            batch.expectedCompleteAt(), batch.completedAt(), batch.revision(), profile);
+            batch.expectedCompleteAt(), batch.completedAt(), batch.revision(), batch.batchRecordOpenedAt(),
+            batch.releasedBy(), batch.tankNameSnapshot(), batch.pillIdSnapshot(), batch.pillSourceSnapshot(),
+            batch.fermentationVolumeL(), batch.fermentationAssignedAt(), batch.fermentationAssignedBy(), batch.batchKind(),
+            batch.productCode(), batch.productName(), profile);
     }
 
     private List<ProfileStepView> findSteps(String recipeId) {

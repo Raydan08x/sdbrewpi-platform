@@ -53,6 +53,8 @@
 - [x] Propiedad exclusiva del control durante la ejecución y pausa segura para intervención manual.
 - [x] Eventos básicos de perfil en el batch record.
 - [x] Bitácora de adiciones estructuradas, observaciones, mediciones manuales y eventos operativos.
+- [x] Lote maestro automático por producto, período `AAMM`, clase y secuencia (`CERV-2609-L001`).
+- [x] Apertura del batch record al liberar la orden y snapshot de fermentador, Pill, fuente y volumen transferido.
 - [ ] Firma de operador ligada a autenticación y roles.
 - [x] Reconocimiento e historial de alarmas con operador, hora y nota.
 - Simulación determinista de fallos y recuperación.
@@ -62,11 +64,13 @@
 - [x] Catálogo base de 43 etapas desde pesajes hasta producto terminado y limpieza final.
 - [x] Vista general de Producción con Fermentación como estación interna.
 - [ ] Configurar pasos opcionales y ruta de envasado por versión de receta.
-- [ ] Orden de producción con estado, responsables, tiempos y equipos por etapa.
+- [x] Liberación básica de orden con código único y estados hasta la asignación de fermentación.
+- [ ] Ejecución completa de la orden con responsables, tiempos y equipos por cada etapa.
 - [ ] Kit de pesajes ligado a reservas y lotes de inventario.
 - [ ] Registros de maceración, cocción, adiciones, enfriado y transferencias.
 - [ ] Consumos, mediciones, liberaciones de calidad y firmas de operador.
 - [ ] Envasado por barril, botella o lata y entrada automática a producto terminado.
+- [ ] Corridas hijas de envasado (`-K01`, `-B01`, `-C01`) y asociación de recipientes físicos (`BRL-001` en adelante) en el batch record.
 
 ## M3 — Banco de hardware
 
@@ -98,6 +102,6 @@
 
 ## Incremento Web - operación de lotes de fermentación
 
-- [x] Formulario de asignación a tanque libre con versión de receta y volumen.
-- [x] Cierre explícito por código de lote, revisión optimista y tanque en OFF.
+- [x] Fermentación solo recibe lotes fabricados y listos; no crea ni cierra el lote maestro.
+- [x] Asignación a tanque libre con volumen real transferido y snapshot de equipo/sensor.
 - [ ] Consulta de lotes cerrados y acceso a su bitácora desde la WebApp.

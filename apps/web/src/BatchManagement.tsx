@@ -1,62 +1,45 @@
 import { useState, type FormEvent } from 'react'
-import { completeBatch, createBatch } from './api'
+import { assignFermentation } from './api'
 import type { Batch, ProductionOverview, Tank } from './types'
+
+const kindLabel = { TEST: 'Prueba', PILOT: 'Piloto', COMMERCIAL: 'Comercial' }
 
 export function BatchManagement({ production, tanks, onChanged }: {
   production: ProductionOverview; tanks: Tank[]; onChanged: () => Promise<void>
 }) {
-  const [editing, setEditing] = useState(false)
-  const [closing, setClosing] = useState<Batch | null>(null)
-  const [confirmation, setConfirmation] = useState('')
+  const [selected, setSelected] = useState<Batch | null>(null)
   const [busy, setBusy] = useState(false)
-  const [error, setError] = useState('')
-  const [notice, setNotice] = useState('')
-  const freeTanks = tanks.filter(tank => !production.activeBatches.some(batch => batch.tankId === tank.id))
+  const [message, setMessage] = useState('')
+  const eligible = production.activeBatches.filter(batch => batch.status === 'READY_FOR_FERMENTATION')
+  const freeTanks = tanks.filter(tank => !production.activeBatches.some(batch => batch.status === 'FERMENTING' && batch.tankId === tank.id))
+
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
+    if (!selected) return
     const data = new FormData(event.currentTarget)
-    setBusy(true); setError(''); setNotice('')
+    setBusy(true); setMessage('')
     try {
-      await createBatch({ code: String(data.get('code')).trim(), recipeVersionId: String(data.get('recipe')),
-        tankId: String(data.get('tank')), volumeL: Number(data.get('volume')) })
-      setEditing(false); setNotice('Lote asignado. Su perfil queda listo para iniciar desde el panel de ejecución.')
+      await assignFermentation(selected, String(data.get('tank')), Number(data.get('volume')))
+      setSelected(null)
+      setMessage('Transferencia registrada. El fermentador y la Pill quedaron guardados en el batch record.')
       await onChanged()
-    } catch (caught) { setError(caught instanceof Error ? caught.message : 'No se pudo crear el lote') }
+    } catch (caught) { setMessage(caught instanceof Error ? caught.message : 'No se pudo asignar la transferencia') }
     finally { setBusy(false) }
   }
-  async function close() {
-    if (!closing || confirmation !== closing.code) return
-    setBusy(true); setError(''); setNotice('')
-    try {
-      await completeBatch(closing)
-      setClosing(null); setConfirmation('')
-      setNotice('Lote cerrado y tanque en OFF. No se registra producto terminado ni se confirma una transferencia física.')
-      await onChanged()
-    } catch (caught) { setError(caught instanceof Error ? caught.message : 'No se pudo cerrar el lote') }
-    finally { setBusy(false) }
-  }
-  return <section className="batch-management" aria-label="Gestión de lotes de fermentación">
-    <div className="batch-management-heading"><div><h3>Lotes de fermentación</h3><p>{freeTanks.length} de {tanks.length} tanques disponibles para asignación</p></div>
-      <button disabled={busy || !freeTanks.length || !production.recipes.length} onClick={() => { setEditing(!editing); setError(''); setNotice('') }}>Nuevo lote</button></div>
-    {!production.recipes.length && <p>Necesitas una versión de receta con perfil antes de asignar un lote.</p>}
-    {!freeTanks.length && <p>Todos los tanques tienen lote activo.</p>}
-    {error && <p role="alert" className="message error">{error}</p>}
-    {notice && <p role="status" className="message success">{notice}</p>}
-    {editing && <form onSubmit={submit}>
-      <fieldset disabled={busy} className="batch-create-fields"><legend>Asignar un lote sin iniciar el control</legend>
-        <label>Código del lote<input name="code" required maxLength={40} pattern=".*\S.*" placeholder="FER-001" /></label>
-        <label>Receta y versión<select name="recipe" required defaultValue=""><option value="" disabled>Selecciona una versión</option>{production.recipes.map(recipe => <option key={recipe.id} value={recipe.id}>{recipe.name} · v{recipe.version}</option>)}</select></label>
-        <label>Fermentador disponible<select name="tank" required defaultValue=""><option value="" disabled>Selecciona un tanque</option>{freeTanks.map(tank => <option key={tank.id} value={tank.id}>{tank.name}</option>)}</select></label>
-        <label>Volumen del lote (L)<input name="volume" type="number" min={1} max={10000} step="0.1" required /></label>
-        <div className="batch-buttons"><button type="submit" disabled={!freeTanks.length}>Asignar lote</button><button type="button" onClick={() => setEditing(false)}>Cancelar</button></div>
-      </fieldset>
-    </form>}
-    <div className="batch-management-list">{production.activeBatches.map(batch => <div key={batch.id}><span><b>{batch.code}</b> · {batch.tankId} · {batch.volumeL} L</span><button disabled={busy} onClick={() => { setClosing(batch); setConfirmation(''); setError(''); setNotice('') }}>Cerrar lote {batch.code}</button></div>)}</div>
-    {closing && <div className="batch-close-confirm" role="group" aria-label="Confirmar cierre de lote">
-      <b>Cerrar {closing.code} en {closing.tankId}</b>
-      <p>El control del tanque quedará en OFF y su asignación quedará libre. Se conserva la información del lote. Esta acción también termina un perfil que aún esté en ejecución.</p>
-      <label>Escribe {closing.code} para confirmar<input value={confirmation} disabled={busy} onChange={event => setConfirmation(event.target.value)} autoComplete="off" /></label>
-      <div className="batch-buttons"><button disabled={busy || confirmation !== closing.code} onClick={close}>Confirmar cierre</button><button disabled={busy} onClick={() => setClosing(null)}>Cancelar cierre</button></div>
-    </div>}
+
+  return <section className="batch-management" aria-label="Asignación de lotes fabricados">
+    <div className="batch-management-heading"><div><h3>Lotes listos para fermentación</h3><p>Solo aparecen lotes liberados por Producción después de fabricación y enfriado.</p></div><span>{eligible.length} disponibles</span></div>
+    {message && <p role="status">{message}</p>}
+    {!eligible.length && <p>No hay lotes pendientes de transferencia.</p>}
+    <div className="batch-management-list">{eligible.map(batch => <div key={batch.id}>
+      <span><b>{batch.code}</b> · {kindLabel[batch.batchKind]} · {batch.productName} · {batch.recipeName} v{batch.recipeVersion}</span>
+      <button disabled={busy || !freeTanks.length} onClick={() => setSelected(batch)}>Asignar fermentador</button>
+    </div>)}</div>
+    {selected && <form onSubmit={submit}><fieldset disabled={busy} className="batch-create-fields"><legend>Transferir {selected.code}</legend>
+      <label>Fermentador disponible<select name="tank" required defaultValue=""><option value="" disabled>Selecciona un tanque</option>{freeTanks.map(tank => <option key={tank.id} value={tank.id}>{tank.name} · Pill {tank.pillId}</option>)}</select></label>
+      <label>Volumen transferido (L)<input name="volume" type="number" min={1} max={10000} step="0.1" required defaultValue={selected.volumeL} /></label>
+      <p>El servidor captura el fermentador, la Pill y la fuente activa como información histórica.</p>
+      <div className="batch-buttons"><button type="submit">Confirmar transferencia</button><button type="button" onClick={() => setSelected(null)}>Cancelar</button></div>
+    </fieldset></form>}
   </section>
 }

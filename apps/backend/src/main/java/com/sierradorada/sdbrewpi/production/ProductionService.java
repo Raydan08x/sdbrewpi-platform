@@ -2,9 +2,13 @@ package com.sierradorada.sdbrewpi.production;
 
 import com.sierradorada.sdbrewpi.shared.RevisionConflictException;
 import com.sierradorada.sdbrewpi.fermentation.FermentationRepository;
+import com.sierradorada.sdbrewpi.fermentation.TankView;
+import com.sierradorada.sdbrewpi.plant.PlantRepository;
 import java.time.Duration;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 import java.util.Locale;
 import java.util.List;
 import java.util.Set;
@@ -20,10 +24,13 @@ public class ProductionService {
     );
     private final ProductionRepository repository;
     private final FermentationRepository fermentationRepository;
+    private final PlantRepository plantRepository;
 
-    public ProductionService(ProductionRepository repository, FermentationRepository fermentationRepository) {
+    public ProductionService(ProductionRepository repository, FermentationRepository fermentationRepository,
+            PlantRepository plantRepository) {
         this.repository = repository;
         this.fermentationRepository = fermentationRepository;
+        this.plantRepository = plantRepository;
     }
 
     public ProductionOverview overview() {
@@ -52,24 +59,76 @@ public class ProductionService {
     }
 
     @Transactional
-    public BatchView createBatch(BatchRequest request, String actor) {
+    public BatchView releaseOrder(ProductionOrderReleaseRequest request, String actor) {
         RecipeView recipe = repository.findRecipe(request.recipeVersionId())
             .orElseThrow(() -> new IllegalArgumentException("La versión de receta no existe"));
-        String code = normalizeCode(request.code());
+        String safeActor = safeActor(actor);
+        Instant now = Instant.now();
+        ZoneId plantZone = ZoneId.of(plantRepository.primarySite().timezone());
+        String period = DateTimeFormatter.ofPattern("yyMM").withZone(plantZone).format(now);
+        int sequence = repository.nextLotNumber(period, request.productCode(), request.batchKind());
+        String token = switch (request.batchKind()) {
+            case "TEST" -> "T";
+            case "PILOT" -> "P";
+            case "COMMERCIAL" -> "L";
+            default -> throw new IllegalArgumentException("El tipo de lote no es válido");
+        };
+        String productName = switch (request.productCode()) {
+            case "CERV" -> "Cerveza";
+            case "HSEL" -> "Hard seltzer";
+            default -> throw new IllegalArgumentException("El producto no es válido");
+        };
+        String code = "%s-%s-%s%03d".formatted(request.productCode(), period, token, sequence);
+        long durationHours = recipe.steps().stream().mapToLong(ProfileStepView::durationHours).sum();
+        String id = UUID.randomUUID().toString();
+        repository.insertReleasedOrder(id, code, recipe, request.plannedVolumeL(), now,
+            now.plus(durationHours, ChronoUnit.HOURS), safeActor, request.batchKind(), request.productCode(), productName);
+        repository.event(UUID.randomUUID().toString(), id, "ORDER_RELEASED", null, safeActor,
+            "Orden liberada; batch record digital abierto con código " + code, now);
+        repository.audit(UUID.randomUUID().toString(), safeActor, id, "RELEASE_PRODUCTION_ORDER", code,
+            "Código de lote reservado y expediente digital abierto");
+        return repository.findBatch(id).orElseThrow();
+    }
+
+    @Transactional
+    public BatchView readyForFermentation(String id, BatchTransitionRequest request, String actor) {
+        BatchView batch = repository.findBatch(id)
+            .orElseThrow(() -> new IllegalArgumentException("El lote no existe"));
+        if (!"RELEASED".equals(batch.status())) {
+            throw new IllegalStateException("Solo una orden liberada puede marcarse lista para fermentación");
+        }
+        if (repository.readyForFermentation(id, request.expectedRevision()) == 0) throw new RevisionConflictException();
+        String safeActor = safeActor(actor);
+        repository.event(UUID.randomUUID().toString(), id, "READY_FOR_FERMENTATION", null, safeActor,
+            "El lote fabricado quedó disponible para transferencia a fermentación", Instant.now());
+        repository.audit(UUID.randomUUID().toString(), safeActor, id, "READY_FOR_FERMENTATION", batch.code(),
+            "Liberación operativa hacia fermentación");
+        return repository.findBatch(id).orElseThrow();
+    }
+
+    @Transactional
+    public BatchView assignFermentation(String id, FermentationAssignmentRequest request, String actor) {
+        BatchView batch = repository.findBatch(id)
+            .orElseThrow(() -> new IllegalArgumentException("El lote no existe"));
+        if (!"READY_FOR_FERMENTATION".equals(batch.status())) {
+            throw new IllegalStateException("El lote todavía no está listo para fermentación");
+        }
         repository.lockTank(request.tankId());
         if (repository.hasActiveBatch(request.tankId())) {
             throw new IllegalStateException("El fermentador ya tiene un lote activo");
         }
-        if (repository.batchCodeExists(code)) {
-            throw new IllegalStateException("El código de lote ya existe");
+        TankView tank = fermentationRepository.findTank(request.tankId())
+            .orElseThrow(() -> new IllegalArgumentException("El fermentador no existe"));
+        String safeActor = safeActor(actor);
+        Instant now = Instant.now();
+        if (repository.assignFermentation(id, tank.id(), tank.name(), tank.pillId(), tank.pillSource(),
+                request.transferredVolumeL(), now, safeActor, request.expectedRevision()) == 0) {
+            throw new RevisionConflictException();
         }
-        long durationHours = recipe.steps().stream().mapToLong(ProfileStepView::durationHours).sum();
-        Instant startedAt = Instant.now();
-        Instant expectedCompleteAt = startedAt.plus(durationHours, ChronoUnit.HOURS);
-        String id = UUID.randomUUID().toString();
-        repository.insertBatch(id, code, recipe, request.tankId(), request.volumeL(), startedAt, expectedCompleteAt);
-        repository.audit(UUID.randomUUID().toString(), safeActor(actor), id, "START_BATCH", code,
-            "Lote asociado al fermentador en simulación");
+        repository.event(UUID.randomUUID().toString(), id, "FERMENTATION_ASSIGNED", null, safeActor,
+            "Transferencia asignada a " + tank.name() + " con " + tank.pillId(), now);
+        repository.audit(UUID.randomUUID().toString(), safeActor, id, "ASSIGN_FERMENTATION",
+            tank.id() + ":" + tank.pillId(), "Tanque y Pill guardados como snapshot del batch record");
         return repository.findBatch(id).orElseThrow();
     }
 
@@ -77,11 +136,11 @@ public class ProductionService {
     public BatchView completeBatch(String id, BatchCompletionRequest request, String actor) {
         BatchView existing = repository.findBatch(id)
             .orElseThrow(() -> new IllegalArgumentException("El lote no existe"));
-        if (!"ACTIVE".equals(existing.status())) throw new IllegalStateException("El lote ya está cerrado");
+        if (Set.of("COMPLETED", "CANCELLED").contains(existing.status())) throw new IllegalStateException("El lote ya está cerrado");
         if (repository.completeBatch(id, request.expectedRevision(), Instant.now()) == 0) {
             throw new RevisionConflictException();
         }
-        fermentationRepository.disableProfileControl(existing.tankId());
+        if (existing.tankId() != null) fermentationRepository.disableProfileControl(existing.tankId());
         repository.audit(UUID.randomUUID().toString(), safeActor(actor), id, "COMPLETE_BATCH", existing.code(),
             "Lote marcado como completado");
         return repository.findBatch(id).orElseThrow();
@@ -199,7 +258,7 @@ public class ProductionService {
     private BatchView activeBatch(String id) {
         BatchView batch = repository.findBatch(id)
             .orElseThrow(() -> new IllegalArgumentException("El lote no existe"));
-        if (!"ACTIVE".equals(batch.status())) throw new IllegalStateException("El lote ya está cerrado");
+        if (!"FERMENTING".equals(batch.status())) throw new IllegalStateException("El lote no está asignado a fermentación");
         if (batch.profile().isEmpty()) throw new IllegalStateException("El lote no tiene perfil de fermentación");
         return batch;
     }

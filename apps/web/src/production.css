@@ -191,6 +191,11 @@
 .batch-record-heading small { margin-top: 2px; color: #68869a; font-size: 8px; }
 .batch-record select, .batch-record input, .batch-record textarea { width: 100%; padding: 8px 9px; border: 1px solid #28485b; border-radius: 6px; color: #cfe0e8; background: #0c1f2c; font: inherit; font-size: 9px; }
 .batch-record-heading > select { width: auto; min-width: 190px; }
+.batch-record-identity { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1px; border-bottom: 1px solid #203e50; background: #203e50; }
+.batch-record-identity > div { display: grid; gap: 4px; min-width: 0; padding: 12px 15px; background: #0c1f2c; }
+.batch-record-identity small { color: #628496; font-size: 7px; letter-spacing: .8px; }
+.batch-record-identity b { overflow-wrap: anywhere; color: #d5e7ef; font-size: 10px; }
+.batch-record-identity span { overflow-wrap: anywhere; color: #7896a6; font-size: 8px; }
 .batch-record-body { display: grid; grid-template-columns: minmax(260px, .85fr) minmax(320px, 1.15fr); }
 .batch-record form { display: grid; gap: 10px; padding: 15px; border-right: 1px solid #203e50; }
 .batch-record label { display: grid; gap: 5px; color: #7692a3; font-size: 8px; letter-spacing: .5px; }
@@ -214,6 +219,7 @@
   .batch-record-body { grid-template-columns: 1fr; }
   .batch-record form { border-right: 0; border-bottom: 1px solid #203e50; }
   .event-form-row, .event-form-row.addition { grid-template-columns: 1fr; }
+  .batch-record-identity { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 .batch-management { margin: 20px 0; padding: 22px; border: 1px solid #304156; border-radius: 12px; background: #152131; }
 .batch-management p { color: #b6c4d4; line-height: 1.6; }
@@ -226,4 +232,4 @@
 .batch-management-list > div { border-top: 1px solid #304156; padding: 12px 0; overflow-wrap: anywhere; }
 .batch-close-confirm { border: 1px solid #c68c36; padding: 16px; border-radius: 8px; margin-top: 12px; }
 .batch-close-confirm .batch-buttons { margin-top: 12px; }
-@media (max-width: 600px) { .batch-create-fields { grid-template-columns: minmax(0, 1fr); } .batch-management { padding: 14px; } }
+@media (max-width: 600px) { .batch-create-fields, .batch-record-identity { grid-template-columns: minmax(0, 1fr); } .batch-management { padding: 14px; } }

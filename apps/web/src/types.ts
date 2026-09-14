@@ -88,7 +88,7 @@ export interface FermentationMeasurement {
 }
 
 export interface FermentationHistory {
-  tankId: string
+  tankId: string | null
   from: string
   generatedAt: string
   samples: FermentationMeasurement[]
@@ -135,6 +135,17 @@ export interface Batch {
   expectedCompleteAt: string
   completedAt: string | null
   revision: number
+  batchRecordOpenedAt: string | null
+  releasedBy: string | null
+  tankNameSnapshot: string | null
+  pillIdSnapshot: string | null
+  pillSourceSnapshot: string | null
+  fermentationVolumeL: number | null
+  fermentationAssignedAt: string | null
+  fermentationAssignedBy: string | null
+  batchKind: 'TEST' | 'PILOT' | 'COMMERCIAL'
+  productCode: 'CERV' | 'HSEL'
+  productName: string
   profile: ProfileStep[]
 }
 

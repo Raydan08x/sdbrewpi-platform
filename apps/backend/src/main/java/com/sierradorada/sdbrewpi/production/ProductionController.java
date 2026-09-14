@@ -33,11 +33,23 @@ public class ProductionController {
         return ResponseEntity.created(URI.create("/api/v1/production/recipes/" + created.id())).body(created);
     }
 
-    @PostMapping("/batches")
-    ResponseEntity<BatchView> createBatch(@Valid @RequestBody BatchRequest request,
+    @PostMapping("/orders/release")
+    ResponseEntity<BatchView> releaseOrder(@Valid @RequestBody ProductionOrderReleaseRequest request,
             @RequestHeader(value = "X-Actor", required = false) String actor) {
-        BatchView created = service.createBatch(request, actor);
+        BatchView created = service.releaseOrder(request, actor);
         return ResponseEntity.created(URI.create("/api/v1/production/batches/" + created.id())).body(created);
+    }
+
+    @PutMapping("/batches/{id}/ready-for-fermentation")
+    BatchView readyForFermentation(@PathVariable String id, @Valid @RequestBody BatchTransitionRequest request,
+            @RequestHeader(value = "X-Actor", required = false) String actor) {
+        return service.readyForFermentation(id, request, actor);
+    }
+
+    @PutMapping("/batches/{id}/fermentation-assignment")
+    BatchView assignFermentation(@PathVariable String id, @Valid @RequestBody FermentationAssignmentRequest request,
+            @RequestHeader(value = "X-Actor", required = false) String actor) {
+        return service.assignFermentation(id, request, actor);
     }
 
     @PutMapping("/batches/{id}/complete")

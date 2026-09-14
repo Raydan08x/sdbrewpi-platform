@@ -107,30 +107,33 @@ try {
   })
   await delay(900)
   const production = await inspectLayout('Producción')
+  const releaseButton = await send('Runtime.evaluate', { returnByValue: true, expression: `(() => {
+    const release = [...document.querySelectorAll('button')].find(button => button.textContent.includes('Liberar orden'));
+    if (!release) throw new Error('No se encontró la liberación de orden');
+    release.click();
+    return true;
+  })()` })
+  if (releaseButton.exceptionDetails) throw new Error('No se encontró la liberación de orden')
+  await delay(200)
+  const orderGuard = await send('Runtime.evaluate', { returnByValue: true, expression: `(() => {
+    const form = document.querySelector('.production-orders form');
+    if (!form || form.checkValidity()) throw new Error('La orden vacía debe ser inválida');
+    return true;
+  })()` })
+  if (orderGuard.exceptionDetails) throw new Error('Falló validación de liberación de orden')
+  const orderEditor = await inspectLayout('Liberación de orden')
   await send('Runtime.evaluate', {
     expression: `([...document.querySelectorAll('button')].find(button => button.textContent.includes('Fermentación'))).click()`,
   })
   await delay(1200)
   const fermentation = await inspectLayout('Fermentación')
-  await send('Runtime.evaluate', { expression: `document.querySelector('.batch-management-heading button').click()` })
-  await delay(200)
-  const batchEditor = await inspectLayout('Asignación de lote')
-  const check = await send('Runtime.evaluate', { returnByValue: true, expression: `(() => {
-    const form = document.querySelector('.batch-management form');
-    if (!form || form.checkValidity()) throw new Error('El formulario vacío debe ser inválido');
-    document.querySelector('.batch-management-list button').click();
+  const fermentationGuard = await send('Runtime.evaluate', { returnByValue: true, expression: `(() => {
+    if (document.body.textContent.includes('Nuevo lote')) throw new Error('Fermentación todavía permite crear lotes');
+    if (document.body.textContent.includes('Cerrar lote')) throw new Error('Fermentación todavía permite cerrar lotes');
+    if (!document.body.textContent.includes('Lotes listos para fermentación')) throw new Error('Falta la bandeja de transferencia');
     return true;
   })()` })
-  if (check.exceptionDetails) throw new Error('Falló validación de formulario de lote')
-  await delay(200)
-  const closeEditor = await inspectLayout('Confirmación de cierre')
-  const guard = await send('Runtime.evaluate', { returnByValue: true, expression: `(() => {
-    const button = document.querySelector('.batch-close-confirm button');
-    if (!button || !button.disabled) throw new Error('Cierre habilitado sin confirmación');
-    document.querySelectorAll('.batch-close-confirm button')[1].click();
-    return true;
-  })()` })
-  if (guard.exceptionDetails) throw new Error('Falló protección del cierre de lote')
+  if (fermentationGuard.exceptionDetails) throw new Error('Falló separación Producción/Fermentación')
   await send('Emulation.setDeviceMetricsOverride', {width: 1440, height: 1000, deviceScaleFactor: 1, mobile: false})
   await delay(200)
   const desktop = await inspectLayout('Fermentación escritorio')
@@ -138,7 +141,7 @@ try {
     const capture = await send('Page.captureScreenshot', {format: 'png', captureBeyondViewport: false})
     await writeFile(process.env.QA_SCREENSHOT, Buffer.from(capture.data, 'base64'))
   }
-  const results = [plant, warehouseEditor, production, fermentation, batchEditor, closeEditor, desktop]
+  const results = [plant, warehouseEditor, production, orderEditor, fermentation, desktop]
   console.log(JSON.stringify(results, null, 2))
   socket.close()
   if (results.some(result => result.documentWidth > result.viewportWidth || result.offenders.length > 0)) process.exitCode = 1

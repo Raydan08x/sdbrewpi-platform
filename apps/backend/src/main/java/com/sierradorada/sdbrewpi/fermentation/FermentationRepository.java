@@ -54,7 +54,7 @@ public class FermentationRepository {
     public Optional<String> findActiveProfileState(String tankId) {
         return jdbc.query("""
             SELECT profile_state FROM production_batch
-            WHERE tank_id = ? AND status = 'ACTIVE'
+            WHERE tank_id = ? AND status = 'FERMENTING'
             """, (rs, row) -> rs.getString("profile_state"), tankId).stream().findFirst();
     }
 

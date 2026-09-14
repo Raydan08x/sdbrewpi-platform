@@ -43,41 +43,120 @@ class ProductionControllerTest {
     }
 
     @Test
-    void createsVersionedRecipeAndAssignsBatchToFreeTank() throws Exception {
+    void releasesMasterLotThenAssignsItsFermentationSnapshot() throws Exception {
+        String releasedJson = mvc.perform(post("/api/v1/production/orders/release")
+                .header("X-Actor", "qa-planner")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {"recipeVersionId":"00000000-0000-0000-0000-000000000101","plannedVolumeL":175,
+                     "batchKind":"PILOT","productCode":"CERV"}
+                    """))
+            .andExpect(status().isCreated())
+            .andExpect(jsonPath("$.code").value(org.hamcrest.Matchers.matchesPattern("CERV-[0-9]{4}-P001")))
+            .andExpect(jsonPath("$.status").value("RELEASED"))
+            .andExpect(jsonPath("$.tankId").isEmpty())
+            .andExpect(jsonPath("$.batchRecordOpenedAt").isNotEmpty())
+            .andExpect(jsonPath("$.releasedBy").value("qa-planner"))
+            .andExpect(jsonPath("$.batchKind").value("PILOT"))
+            .andExpect(jsonPath("$.productName").value("Cerveza"))
+            .andReturn().getResponse().getContentAsString();
+        JsonNode released = objectMapper.readTree(releasedJson);
+        String batchId = released.get("id").asText();
+
+        mvc.perform(put("/api/v1/production/batches/" + batchId + "/ready-for-fermentation")
+                .header("X-Actor", "qa-brewer")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"expectedRevision\":0}"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.status").value("READY_FOR_FERMENTATION"))
+            .andExpect(jsonPath("$.revision").value(1));
+
+        mvc.perform(put("/api/v1/production/batches/" + batchId + "/fermentation-assignment")
+                .header("X-Actor", "qa-cellar")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"tankId\":\"TANK-02\",\"transferredVolumeL\":170,\"expectedRevision\":1}"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.status").value("FERMENTING"))
+            .andExpect(jsonPath("$.tankId").value("TANK-02"))
+            .andExpect(jsonPath("$.tankNameSnapshot").value("Fermentador 2"))
+            .andExpect(jsonPath("$.pillIdSnapshot").value("PILL-3BA4"))
+            .andExpect(jsonPath("$.pillSourceSnapshot").isNotEmpty())
+            .andExpect(jsonPath("$.fermentationVolumeL").value(170))
+            .andExpect(jsonPath("$.fermentationAssignedAt").isNotEmpty())
+            .andExpect(jsonPath("$.fermentationAssignedBy").value("qa-cellar"));
+
+        mvc.perform(get("/api/v1/production/batches/" + batchId + "/events"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.length()").value(3))
+            .andExpect(jsonPath("$[0].eventType").value("FERMENTATION_ASSIGNED"));
+    }
+
+    @Test
+    void keepsIndependentCountersForTestPilotAndCommercialLots() throws Exception {
+        String base = "{\"recipeVersionId\":\"00000000-0000-0000-0000-000000000101\",\"plannedVolumeL\":100,";
+        mvc.perform(post("/api/v1/production/orders/release").contentType(MediaType.APPLICATION_JSON)
+                .content(base + "\"batchKind\":\"TEST\",\"productCode\":\"CERV\"}"))
+            .andExpect(status().isCreated())
+            .andExpect(jsonPath("$.code").value(org.hamcrest.Matchers.matchesPattern("CERV-[0-9]{4}-T001")));
+        mvc.perform(post("/api/v1/production/orders/release").contentType(MediaType.APPLICATION_JSON)
+                .content(base + "\"batchKind\":\"PILOT\",\"productCode\":\"CERV\"}"))
+            .andExpect(status().isCreated())
+            .andExpect(jsonPath("$.code").value(org.hamcrest.Matchers.matchesPattern("CERV-[0-9]{4}-P001")));
+        mvc.perform(post("/api/v1/production/orders/release").contentType(MediaType.APPLICATION_JSON)
+                .content(base + "\"batchKind\":\"COMMERCIAL\",\"productCode\":\"HSEL\"}"))
+            .andExpect(status().isCreated())
+            .andExpect(jsonPath("$.code").value(org.hamcrest.Matchers.matchesPattern("HSEL-[0-9]{4}-L001")));
+    }
+
+    @Test
+    void rejectsFermenterAssignmentBeforeLotIsReady() throws Exception {
+        String releasedJson = mvc.perform(post("/api/v1/production/orders/release")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {"recipeVersionId":"00000000-0000-0000-0000-000000000101","plannedVolumeL":100,
+                     "batchKind":"TEST","productCode":"CERV"}
+                    """))
+            .andExpect(status().isCreated()).andReturn().getResponse().getContentAsString();
+        String batchId = objectMapper.readTree(releasedJson).get("id").asText();
+
+        mvc.perform(put("/api/v1/production/batches/" + batchId + "/fermentation-assignment")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"tankId\":\"TANK-02\",\"transferredVolumeL\":95,\"expectedRevision\":0}"))
+            .andExpect(status().isConflict())
+            .andExpect(jsonPath("$.code").value("STATE_CONFLICT"));
+    }
+
+    @Test
+    void createsVersionedRecipe() throws Exception {
         String recipeBody = """
             {"code":"qa-lager","name":"Lager QA","originalGravity":1.048,"targetFinalGravity":1.010,
              "defaultVolumeL":180,"notes":"Prueba","steps":[
                {"name":"Principal","targetTemperatureC":12,"durationHours":168},
                {"name":"Maduración","targetTemperatureC":4,"durationHours":96}]}
             """;
-        String recipeJson = mvc.perform(post("/api/v1/production/recipes")
+        mvc.perform(post("/api/v1/production/recipes")
                 .header("X-Actor", "qa")
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(recipeBody))
             .andExpect(status().isCreated())
             .andExpect(jsonPath("$.code").value("QA-LAGER"))
             .andExpect(jsonPath("$.version").value(1))
-            .andReturn().getResponse().getContentAsString();
-        JsonNode recipe = objectMapper.readTree(recipeJson);
-
-        String batchBody = "{\"code\":\"qa-lote-002\",\"recipeVersionId\":\"" + recipe.get("id").asText()
-            + "\",\"tankId\":\"TANK-02\",\"volumeL\":175}";
-        mvc.perform(post("/api/v1/production/batches")
-                .header("X-Actor", "qa")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(batchBody))
-            .andExpect(status().isCreated())
-            .andExpect(jsonPath("$.code").value("QA-LOTE-002"))
-            .andExpect(jsonPath("$.recipeName").value("Lager QA"))
-            .andExpect(jsonPath("$.tankId").value("TANK-02"))
-            .andExpect(jsonPath("$.profile.length()").value(2));
+            .andExpect(jsonPath("$.steps.length()").value(2));
     }
 
     @Test
     void rejectsSecondActiveBatchForSameTank() throws Exception {
-        mvc.perform(post("/api/v1/production/batches")
+        String released = mvc.perform(post("/api/v1/production/orders/release")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"code\":\"CONFLICT\",\"recipeVersionId\":\"00000000-0000-0000-0000-000000000101\",\"tankId\":\"TANK-01\",\"volumeL\":200}"))
+                .content("{\"recipeVersionId\":\"00000000-0000-0000-0000-000000000101\",\"plannedVolumeL\":200,\"batchKind\":\"TEST\",\"productCode\":\"CERV\"}"))
+            .andExpect(status().isCreated()).andReturn().getResponse().getContentAsString();
+        String batchId = objectMapper.readTree(released).get("id").asText();
+        mvc.perform(put("/api/v1/production/batches/" + batchId + "/ready-for-fermentation")
+                .contentType(MediaType.APPLICATION_JSON).content("{\"expectedRevision\":0}"))
+            .andExpect(status().isOk());
+        mvc.perform(put("/api/v1/production/batches/" + batchId + "/fermentation-assignment")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"tankId\":\"TANK-01\",\"transferredVolumeL\":200,\"expectedRevision\":1}"))
             .andExpect(status().isConflict())
             .andExpect(jsonPath("$.code").value("STATE_CONFLICT"));
     }
@@ -113,10 +192,18 @@ class ProductionControllerTest {
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.status").value("COMPLETED"));
 
-        mvc.perform(post("/api/v1/production/batches")
+        String released = mvc.perform(post("/api/v1/production/orders/release")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"code\":\"SIM-LOTE-002\",\"recipeVersionId\":\"00000000-0000-0000-0000-000000000101\",\"tankId\":\"TANK-01\",\"volumeL\":200}"))
-            .andExpect(status().isCreated())
+                .content("{\"recipeVersionId\":\"00000000-0000-0000-0000-000000000101\",\"plannedVolumeL\":200,\"batchKind\":\"TEST\",\"productCode\":\"CERV\"}"))
+            .andExpect(status().isCreated()).andReturn().getResponse().getContentAsString();
+        String batchId = objectMapper.readTree(released).get("id").asText();
+        mvc.perform(put("/api/v1/production/batches/" + batchId + "/ready-for-fermentation")
+                .contentType(MediaType.APPLICATION_JSON).content("{\"expectedRevision\":0}"))
+            .andExpect(status().isOk());
+        mvc.perform(put("/api/v1/production/batches/" + batchId + "/fermentation-assignment")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"tankId\":\"TANK-01\",\"transferredVolumeL\":200,\"expectedRevision\":1}"))
+            .andExpect(status().isOk())
             .andExpect(jsonPath("$.tankId").value("TANK-01"));
 
         mvc.perform(get("/api/v1/fermentation/overview"))
