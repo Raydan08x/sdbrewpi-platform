@@ -100,10 +100,12 @@ export const completeBatch = (batch: { id: string; revision: number }) =>
 export const releaseProductionOrder = (values: { recipeVersionId: string; plannedVolumeL: number; batchKind: 'TEST' | 'PILOT' | 'COMMERCIAL'; productCode: 'CERV' | 'HSEL' }) =>
   request<Batch>('/api/v1/production/orders/release', { method: 'POST', body: JSON.stringify(values) })
 
-export const markReadyForFermentation = (batch: Batch) =>
-  request<Batch>(`/api/v1/production/batches/${batch.id}/ready-for-fermentation`, {
-    method: 'PUT', body: JSON.stringify({ expectedRevision: batch.revision })
-  })
+export const commandProductionStage = (batch: Batch, stageCode: string, values: {
+  action: 'START' | 'COMPLETE' | 'SKIP'; expectedStageRevision: number; notes?: string;
+  measuredValue?: number; unit?: string
+}) => request<Batch>(`/api/v1/production/batches/${batch.id}/stages/${stageCode}`, {
+  method: 'PUT', body: JSON.stringify({ ...values, expectedBatchRevision: batch.revision })
+})
 
 export const assignFermentation = (batch: Batch, tankId: string, transferredVolumeL: number) =>
   request<Batch>(`/api/v1/production/batches/${batch.id}/fermentation-assignment`, {

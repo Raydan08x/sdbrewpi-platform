@@ -146,7 +146,27 @@ export interface Batch {
   batchKind: 'TEST' | 'PILOT' | 'COMMERCIAL'
   productCode: 'CERV' | 'HSEL'
   productName: string
+  executionStages: BatchStage[]
   profile: ProfileStep[]
+}
+
+export interface BatchStage {
+  code: string
+  phase: string
+  order: number
+  name: string
+  description: string
+  optional: boolean
+  variant: string
+  status: 'PENDING' | 'IN_PROGRESS' | 'COMPLETED' | 'SKIPPED'
+  startedAt: string | null
+  startedBy: string | null
+  completedAt: string | null
+  completedBy: string | null
+  notes: string
+  measuredValue: number | null
+  unit: string | null
+  revision: number
 }
 
 export interface BatchEvent {

@@ -65,9 +65,11 @@
 - [x] Vista general de Producción con Fermentación como estación interna.
 - [ ] Configurar pasos opcionales y ruta de envasado por versión de receta.
 - [x] Liberación básica de orden con código único y estados hasta la asignación de fermentación.
-- [ ] Ejecución completa de la orden con responsables, tiempos y equipos por cada etapa.
+- [x] Ejecución secuencial desde kit de pesajes hasta enfriado, con responsables, tiempos, notas y mediciones.
+- [ ] Extender la ejecución registrada a fermentación, maduración, envasado y cierre de la orden.
 - [ ] Kit de pesajes ligado a reservas y lotes de inventario.
-- [ ] Registros de maceración, cocción, adiciones, enfriado y transferencias.
+- [x] Registro genérico de inicio, cierre, notas y mediciones para maceración, cocción, adiciones, enfriado y transferencias.
+- [ ] Formularios especializados y límites de proceso para cada etapa del tren de cocción.
 - [ ] Consumos, mediciones, liberaciones de calidad y firmas de operador.
 - [ ] Envasado por barril, botella o lata y entrada automática a producto terminado.
 - [ ] Corridas hijas de envasado (`-K01`, `-B01`, `-C01`) y asociación de recipientes físicos (`BRL-001` en adelante) en el batch record.

@@ -109,11 +109,13 @@ try {
   const production = await inspectLayout('Producción')
   const releaseButton = await send('Runtime.evaluate', { returnByValue: true, expression: `(() => {
     const release = [...document.querySelectorAll('button')].find(button => button.textContent.includes('Liberar orden'));
-    if (!release) throw new Error('No se encontró la liberación de orden');
+    if (!release) return { found: false, body: document.body.innerText.slice(0, 1500) };
     release.click();
-    return true;
+    return { found: true };
   })()` })
-  if (releaseButton.exceptionDetails) throw new Error('No se encontró la liberación de orden')
+  if (releaseButton.exceptionDetails || !releaseButton.result.value.found) {
+    throw new Error(`No se encontró la liberación de orden. Pantalla: ${releaseButton.result.value?.body ?? 'sin contenido'}`)
+  }
   await delay(200)
   const orderGuard = await send('Runtime.evaluate', { returnByValue: true, expression: `(() => {
     const form = document.querySelector('.production-orders form');
@@ -122,6 +124,26 @@ try {
   })()` })
   if (orderGuard.exceptionDetails) throw new Error('Falló validación de liberación de orden')
   const orderEditor = await inspectLayout('Liberación de orden')
+  await send('Runtime.evaluate', {
+    expression: `([...document.querySelectorAll('button')].find(button => button.textContent.trim() === 'Cancelar'))?.click()`,
+  })
+  await delay(300)
+  const stageGuard = await send('Runtime.evaluate', { returnByValue: true, expression: `(() => {
+    const panel = document.querySelector('.production-stage-panel');
+    if (!panel) throw new Error('No se encontró el ejecutor del batch record');
+    if (!panel.textContent.includes('Armar kit y realizar pesajes')) throw new Error('La primera etapa ejecutable no es el kit de pesajes');
+    if (![...panel.querySelectorAll('button')].some(button => button.textContent.includes('Iniciar'))) {
+      throw new Error('Falta la acción para iniciar la etapa');
+    }
+    panel.scrollIntoView({ block: 'start' });
+    return true;
+  })()` })
+  if (stageGuard.exceptionDetails) throw new Error('Falló el ejecutor previo a fermentación')
+  const stageExecution = await inspectLayout('Batch record previo a fermentación')
+  if (process.env.QA_SCREENSHOT) {
+    const capture = await send('Page.captureScreenshot', {format: 'png', captureBeyondViewport: false})
+    await writeFile(process.env.QA_SCREENSHOT, Buffer.from(capture.data, 'base64'))
+  }
   await send('Runtime.evaluate', {
     expression: `([...document.querySelectorAll('button')].find(button => button.textContent.includes('Fermentación'))).click()`,
   })
@@ -137,11 +159,18 @@ try {
   await send('Emulation.setDeviceMetricsOverride', {width: 1440, height: 1000, deviceScaleFactor: 1, mobile: false})
   await delay(200)
   const desktop = await inspectLayout('Fermentación escritorio')
-  if (process.env.QA_SCREENSHOT) {
-    const capture = await send('Page.captureScreenshot', {format: 'png', captureBeyondViewport: false})
-    await writeFile(process.env.QA_SCREENSHOT, Buffer.from(capture.data, 'base64'))
-  }
-  const results = [plant, warehouseEditor, production, orderEditor, fermentation, desktop]
+  await send('Runtime.evaluate', {
+    expression: `([...document.querySelectorAll('nav button')].find(button => button.textContent.includes('Producción'))).click()`,
+  })
+  await delay(300)
+  await send('Runtime.evaluate', {
+    expression: `([...document.querySelectorAll('button')].find(button => button.textContent.includes('Vista general'))).click()`,
+  })
+  await delay(600)
+  const productionDesktop = await inspectLayout('Producción escritorio')
+  const desktopStageGuard = await send('Runtime.evaluate', { returnByValue: true, expression: `Boolean(document.querySelector('.production-stage-panel'))` })
+  if (!desktopStageGuard.result.value) throw new Error('Falta el batch record en Producción escritorio')
+  const results = [plant, warehouseEditor, production, orderEditor, stageExecution, fermentation, desktop, productionDesktop]
   console.log(JSON.stringify(results, null, 2))
   socket.close()
   if (results.some(result => result.documentWidth > result.viewportWidth || result.offenders.length > 0)) process.exitCode = 1

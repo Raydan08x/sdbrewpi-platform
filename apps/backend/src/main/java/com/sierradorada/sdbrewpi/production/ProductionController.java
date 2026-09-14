@@ -40,10 +40,11 @@ public class ProductionController {
         return ResponseEntity.created(URI.create("/api/v1/production/batches/" + created.id())).body(created);
     }
 
-    @PutMapping("/batches/{id}/ready-for-fermentation")
-    BatchView readyForFermentation(@PathVariable String id, @Valid @RequestBody BatchTransitionRequest request,
+    @PutMapping("/batches/{id}/stages/{stageCode}")
+    BatchView commandStage(@PathVariable String id, @PathVariable String stageCode,
+            @Valid @RequestBody StageCommandRequest request,
             @RequestHeader(value = "X-Actor", required = false) String actor) {
-        return service.readyForFermentation(id, request, actor);
+        return service.commandStage(id, stageCode, request, actor);
     }
 
     @PutMapping("/batches/{id}/fermentation-assignment")

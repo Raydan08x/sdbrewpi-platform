@@ -34,4 +34,5 @@ public record BatchView(
         String batchKind,
         String productCode,
         String productName,
+        List<BatchStageView> executionStages,
         List<ProfileStepView> profile) {}

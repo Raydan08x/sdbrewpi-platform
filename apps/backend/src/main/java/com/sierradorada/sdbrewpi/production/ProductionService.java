@@ -83,6 +83,10 @@ public class ProductionService {
         String id = UUID.randomUUID().toString();
         repository.insertReleasedOrder(id, code, recipe, request.plannedVolumeL(), now,
             now.plus(durationHours, ChronoUnit.HOURS), safeActor, request.batchKind(), request.productCode(), productName);
+        for (ProductionStageView stage : repository.findProcessStages()) {
+            repository.insertStageExecution(UUID.randomUUID().toString(), id, stage,
+                "ORDER_RELEASE".equals(stage.code()) ? "COMPLETED" : "PENDING", now, safeActor);
+        }
         repository.event(UUID.randomUUID().toString(), id, "ORDER_RELEASED", null, safeActor,
             "Orden liberada; batch record digital abierto con código " + code, now);
         repository.audit(UUID.randomUUID().toString(), safeActor, id, "RELEASE_PRODUCTION_ORDER", code,
@@ -91,19 +95,67 @@ public class ProductionService {
     }
 
     @Transactional
-    public BatchView readyForFermentation(String id, BatchTransitionRequest request, String actor) {
+    public BatchView commandStage(String id, String stageCode, StageCommandRequest request, String actor) {
         BatchView batch = repository.findBatch(id)
             .orElseThrow(() -> new IllegalArgumentException("El lote no existe"));
         if (!"RELEASED".equals(batch.status())) {
-            throw new IllegalStateException("Solo una orden liberada puede marcarse lista para fermentación");
+            throw new IllegalStateException("Las etapas de fabricación solo se ejecutan en una orden liberada");
         }
-        if (repository.readyForFermentation(id, request.expectedRevision()) == 0) throw new RevisionConflictException();
+        List<BatchStageView> preparation = batch.executionStages().stream().filter(stage -> stage.order() <= 180).toList();
+        BatchStageView current = preparation.stream()
+            .filter(stage -> !Set.of("COMPLETED", "SKIPPED").contains(stage.status())).findFirst()
+            .orElseThrow(() -> new IllegalStateException("La fabricación previa a fermentación ya está completa"));
+        if (!current.code().equals(stageCode)) {
+            throw new IllegalStateException("Primero debes resolver la etapa " + current.name());
+        }
         String safeActor = safeActor(actor);
-        repository.event(UUID.randomUUID().toString(), id, "READY_FOR_FERMENTATION", null, safeActor,
-            "El lote fabricado quedó disponible para transferencia a fermentación", Instant.now());
-        repository.audit(UUID.randomUUID().toString(), safeActor, id, "READY_FOR_FERMENTATION", batch.code(),
-            "Liberación operativa hacia fermentación");
-        return repository.findBatch(id).orElseThrow();
+        Instant now = Instant.now();
+        String notes = request.notes() == null ? "" : request.notes().trim();
+        String unit = blankToNull(request.unit());
+        if ((request.measuredValue() == null) != (unit == null)) {
+            throw new IllegalArgumentException("La medición y su unidad deben registrarse juntas");
+        }
+        if (repository.touchBatchRevision(id, request.expectedBatchRevision()) == 0) throw new RevisionConflictException();
+        int changed;
+        String eventType;
+        String message;
+        switch (request.action()) {
+            case "START" -> {
+                if (!"PENDING".equals(current.status())) throw new IllegalStateException("La etapa ya fue iniciada");
+                changed = repository.startStage(id, stageCode, request.expectedStageRevision(), now, safeActor);
+                eventType = "PRODUCTION_STAGE_STARTED";
+                message = "Etapa iniciada: " + current.name();
+            }
+            case "COMPLETE" -> {
+                if (!"IN_PROGRESS".equals(current.status())) throw new IllegalStateException("Debes iniciar la etapa antes de completarla");
+                changed = repository.finishStage(id, stageCode, "COMPLETED", request.expectedStageRevision(), now,
+                    safeActor, notes, request.measuredValue(), unit);
+                eventType = "PRODUCTION_STAGE_COMPLETED";
+                message = "Etapa completada: " + current.name();
+            }
+            case "SKIP" -> {
+                if (!current.optional()) throw new IllegalStateException("Una etapa obligatoria no se puede omitir");
+                changed = repository.finishStage(id, stageCode, "SKIPPED", request.expectedStageRevision(), now,
+                    safeActor, notes, request.measuredValue(), unit);
+                eventType = "PRODUCTION_STAGE_SKIPPED";
+                message = "Etapa opcional omitida: " + current.name();
+            }
+            default -> throw new IllegalArgumentException("La acción de etapa no es válida");
+        }
+        if (changed == 0) throw new RevisionConflictException();
+        repository.event(UUID.randomUUID().toString(), id, eventType, null, safeActor,
+            notes.isBlank() ? message : message + ". " + notes, now);
+        repository.audit(UUID.randomUUID().toString(), safeActor, id, eventType, stageCode, message);
+        repository.markReadyWhenPreparationComplete(id);
+        BatchView updated = repository.findBatch(id).orElseThrow();
+        if ("READY_FOR_FERMENTATION".equals(updated.status())) {
+            repository.event(UUID.randomUUID().toString(), id, "READY_FOR_FERMENTATION", null, safeActor,
+                "Fabricación y enfriado completos; lote disponible para transferencia", now);
+            repository.audit(UUID.randomUUID().toString(), safeActor, id, "READY_FOR_FERMENTATION", batch.code(),
+                "Liberación automática hacia fermentación");
+            updated = repository.findBatch(id).orElseThrow();
+        }
+        return updated;
     }
 
     @Transactional

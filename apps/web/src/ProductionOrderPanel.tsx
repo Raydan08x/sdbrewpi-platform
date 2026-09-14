@@ -1,6 +1,7 @@
 import { useState, type FormEvent } from 'react'
-import { markReadyForFermentation, releaseProductionOrder } from './api'
+import { releaseProductionOrder } from './api'
 import type { Batch, ProductionOverview } from './types'
+import { ProductionStagePanel } from './ProductionStagePanel'
 
 const kindLabel = { TEST: 'Prueba técnica', PILOT: 'Lote piloto', COMMERCIAL: 'Lote comercial' }
 
@@ -17,12 +18,6 @@ export function ProductionOrderPanel({ production, onChanged }: { production: Pr
     } catch (caught) { setMessage(caught instanceof Error ? caught.message : 'No se pudo liberar la orden') }
     finally { setBusy('') }
   }
-  async function ready(batch: Batch) {
-    setBusy(batch.id); setMessage('')
-    try { await markReadyForFermentation(batch); setMessage(`${batch.code} quedó disponible en Fermentación.`); await onChanged() }
-    catch (caught) { setMessage(caught instanceof Error ? caught.message : 'No se pudo liberar el lote hacia fermentación') }
-    finally { setBusy('') }
-  }
   const released = production.activeBatches.filter(batch => batch.status === 'RELEASED')
   return <section className="batch-management production-orders">
     <div className="batch-management-heading"><div><h3>Órdenes y batch record</h3><p>El código nace al liberar la orden y nunca se reutiliza.</p></div><button onClick={() => setEditing(!editing)}>Liberar orden</button></div>
@@ -34,6 +29,6 @@ export function ProductionOrderPanel({ production, onChanged }: { production: Pr
       <label>Volumen planeado (L)<input name="volume" type="number" min={1} max={10000} step="0.1" required /></label>
       <div className="batch-buttons"><button type="submit">Liberar y abrir expediente</button><button type="button" onClick={() => setEditing(false)}>Cancelar</button></div>
     </fieldset></form>}
-    <div className="batch-management-list">{released.map(batch => <div key={batch.id}><span><b>{batch.code}</b> · {kindLabel[batch.batchKind]} · {batch.productName} · {batch.recipeName}</span><button disabled={!!busy} onClick={() => ready(batch)}>Marcar fabricación lista</button></div>)}</div>
+    <div className="production-order-list">{released.map(batch => <article key={batch.id} className="production-order-card"><header><span><b>{batch.code}</b><small>{kindLabel[batch.batchKind]} · {batch.productName} · {batch.recipeName} v{batch.recipeVersion}</small></span><strong>{batch.volumeL.toFixed(1)} L</strong></header><ProductionStagePanel batch={batch} onChanged={onChanged}/></article>)}</div>
   </section>
 }

@@ -93,6 +93,54 @@ public class ProductionRepository {
             productCode, productName);
     }
 
+    public void insertStageExecution(String id, String batchId, ProductionStageView stage, String status,
+            Instant occurredAt, String actor) {
+        boolean completed = "COMPLETED".equals(status);
+        jdbc.update("""
+            INSERT INTO batch_stage_execution
+              (id, batch_id, stage_code, phase_snapshot, step_order_snapshot, name_snapshot,
+               description_snapshot, optional_snapshot, variant_snapshot, status, started_at, started_by,
+               completed_at, completed_by, notes, measured_value, unit, revision)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, '', NULL, NULL, 0)
+            """, id, batchId, stage.code(), stage.phase(), stage.order(), stage.name(), stage.description(),
+            stage.optional(), stage.variant(), status, completed ? Timestamp.from(occurredAt) : null,
+            completed ? actor : null, completed ? Timestamp.from(occurredAt) : null, completed ? actor : null);
+    }
+
+    public int touchBatchRevision(String id, long expectedRevision) {
+        return jdbc.update("UPDATE production_batch SET revision = revision + 1 WHERE id = ? AND status = 'RELEASED' AND revision = ?",
+            id, expectedRevision);
+    }
+
+    public int startStage(String batchId, String stageCode, long expectedRevision, Instant now, String actor) {
+        return jdbc.update("""
+            UPDATE batch_stage_execution SET status = 'IN_PROGRESS', started_at = ?, started_by = ?,
+                revision = revision + 1
+            WHERE batch_id = ? AND stage_code = ? AND status = 'PENDING' AND revision = ?
+            """, Timestamp.from(now), actor, batchId, stageCode, expectedRevision);
+    }
+
+    public int finishStage(String batchId, String stageCode, String status, long expectedRevision, Instant now,
+            String actor, String notes, Double measuredValue, String unit) {
+        return jdbc.update("""
+            UPDATE batch_stage_execution SET status = ?, started_at = COALESCE(started_at, ?),
+                started_by = COALESCE(started_by, ?), completed_at = ?, completed_by = ?, notes = ?,
+                measured_value = ?, unit = ?, revision = revision + 1
+            WHERE batch_id = ? AND stage_code = ? AND status IN ('PENDING', 'IN_PROGRESS') AND revision = ?
+            """, status, Timestamp.from(now), actor, Timestamp.from(now), actor, notes, measuredValue, unit,
+            batchId, stageCode, expectedRevision);
+    }
+
+    public void markReadyWhenPreparationComplete(String batchId) {
+        jdbc.update("""
+            UPDATE production_batch SET status = 'READY_FOR_FERMENTATION'
+            WHERE id = ? AND status = 'RELEASED' AND NOT EXISTS (
+              SELECT 1 FROM batch_stage_execution
+              WHERE batch_id = ? AND step_order_snapshot <= 180 AND status NOT IN ('COMPLETED', 'SKIPPED')
+            )
+            """, batchId, batchId);
+    }
+
     public List<BatchView> findActiveBatches() {
         return jdbc.query("SELECT * FROM production_batch WHERE status NOT IN ('COMPLETED', 'CANCELLED') ORDER BY started_at, code",
             (rs, row) -> mapBatchBase(rs)).stream().map(this::withProfile).toList();
@@ -114,11 +162,6 @@ public class ProductionRepository {
             + "revision = revision + 1 "
             + "WHERE id = ? AND status NOT IN ('COMPLETED', 'CANCELLED') AND revision = ?", Timestamp.from(completedAt),
             Timestamp.from(completedAt), id, expectedRevision);
-    }
-
-    public int readyForFermentation(String id, long expectedRevision) {
-        return jdbc.update("UPDATE production_batch SET status = 'READY_FOR_FERMENTATION', revision = revision + 1 "
-            + "WHERE id = ? AND status = 'RELEASED' AND revision = ?", id, expectedRevision);
     }
 
     public int assignFermentation(String id, String tankId, String tankName, String pillId, String pillSource,
@@ -224,7 +267,7 @@ public class ProductionRepository {
             rs.getString("tank_name_snapshot"), rs.getString("pill_id_snapshot"), rs.getString("pill_source_snapshot"),
             nullableDouble(rs, "fermentation_volume_l"), nullableInstant(rs, "fermentation_assigned_at"),
             rs.getString("fermentation_assigned_by"), rs.getString("batch_kind"), rs.getString("product_code"),
-            rs.getString("product_name"), List.of());
+            rs.getString("product_name"), List.of(), List.of());
     }
 
     private BatchView withProfile(BatchView batch) {
@@ -239,7 +282,17 @@ public class ProductionRepository {
             batch.expectedCompleteAt(), batch.completedAt(), batch.revision(), batch.batchRecordOpenedAt(),
             batch.releasedBy(), batch.tankNameSnapshot(), batch.pillIdSnapshot(), batch.pillSourceSnapshot(),
             batch.fermentationVolumeL(), batch.fermentationAssignedAt(), batch.fermentationAssignedBy(), batch.batchKind(),
-            batch.productCode(), batch.productName(), profile);
+            batch.productCode(), batch.productName(), findExecutionStages(batch.id()), profile);
+    }
+
+    private List<BatchStageView> findExecutionStages(String batchId) {
+        return jdbc.query("SELECT * FROM batch_stage_execution WHERE batch_id = ? ORDER BY step_order_snapshot",
+            (rs, row) -> new BatchStageView(rs.getString("stage_code"), rs.getString("phase_snapshot"),
+                rs.getInt("step_order_snapshot"), rs.getString("name_snapshot"), rs.getString("description_snapshot"),
+                rs.getBoolean("optional_snapshot"), rs.getString("variant_snapshot"), rs.getString("status"),
+                nullableInstant(rs, "started_at"), rs.getString("started_by"), nullableInstant(rs, "completed_at"),
+                rs.getString("completed_by"), rs.getString("notes"), nullableDouble(rs, "measured_value"),
+                rs.getString("unit"), rs.getLong("revision")), batchId);
     }
 
     private List<ProfileStepView> findSteps(String recipeId) {

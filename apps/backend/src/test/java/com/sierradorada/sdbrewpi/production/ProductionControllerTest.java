@@ -5,6 +5,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.junit.jupiter.api.Assertions.assertEquals;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -59,22 +60,21 @@ class ProductionControllerTest {
             .andExpect(jsonPath("$.releasedBy").value("qa-planner"))
             .andExpect(jsonPath("$.batchKind").value("PILOT"))
             .andExpect(jsonPath("$.productName").value("Cerveza"))
+            .andExpect(jsonPath("$.executionStages.length()").value(43))
+            .andExpect(jsonPath("$.executionStages[0].code").value("ORDER_RELEASE"))
+            .andExpect(jsonPath("$.executionStages[0].status").value("COMPLETED"))
+            .andExpect(jsonPath("$.executionStages[1].code").value("WEIGHING_KIT"))
+            .andExpect(jsonPath("$.executionStages[1].status").value("PENDING"))
             .andReturn().getResponse().getContentAsString();
         JsonNode released = objectMapper.readTree(releasedJson);
         String batchId = released.get("id").asText();
-
-        mvc.perform(put("/api/v1/production/batches/" + batchId + "/ready-for-fermentation")
-                .header("X-Actor", "qa-brewer")
-                .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"expectedRevision\":0}"))
-            .andExpect(status().isOk())
-            .andExpect(jsonPath("$.status").value("READY_FOR_FERMENTATION"))
-            .andExpect(jsonPath("$.revision").value(1));
+        BatchView ready = advancePreparation(batchId);
+        assertEquals("READY_FOR_FERMENTATION", ready.status());
 
         mvc.perform(put("/api/v1/production/batches/" + batchId + "/fermentation-assignment")
                 .header("X-Actor", "qa-cellar")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"tankId\":\"TANK-02\",\"transferredVolumeL\":170,\"expectedRevision\":1}"))
+                .content("{\"tankId\":\"TANK-02\",\"transferredVolumeL\":170,\"expectedRevision\":" + ready.revision() + "}"))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.status").value("FERMENTING"))
             .andExpect(jsonPath("$.tankId").value("TANK-02"))
@@ -87,7 +87,6 @@ class ProductionControllerTest {
 
         mvc.perform(get("/api/v1/production/batches/" + batchId + "/events"))
             .andExpect(status().isOk())
-            .andExpect(jsonPath("$.length()").value(3))
             .andExpect(jsonPath("$[0].eventType").value("FERMENTATION_ASSIGNED"));
     }
 
@@ -127,6 +126,30 @@ class ProductionControllerTest {
     }
 
     @Test
+    void enforcesStageOrderAndRequiredSteps() throws Exception {
+        String releasedJson = mvc.perform(post("/api/v1/production/orders/release")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {"recipeVersionId":"00000000-0000-0000-0000-000000000101","plannedVolumeL":100,
+                     "batchKind":"TEST","productCode":"CERV"}
+                    """))
+            .andExpect(status().isCreated()).andReturn().getResponse().getContentAsString();
+        String batchId = objectMapper.readTree(releasedJson).get("id").asText();
+
+        mvc.perform(put("/api/v1/production/batches/" + batchId + "/stages/MILLING")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"action\":\"START\",\"expectedBatchRevision\":0,\"expectedStageRevision\":0}"))
+            .andExpect(status().isConflict())
+            .andExpect(jsonPath("$.message").value("Primero debes resolver la etapa Armar kit y realizar pesajes"));
+
+        mvc.perform(put("/api/v1/production/batches/" + batchId + "/stages/WEIGHING_KIT")
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"action\":\"SKIP\",\"expectedBatchRevision\":0,\"expectedStageRevision\":0}"))
+            .andExpect(status().isConflict())
+            .andExpect(jsonPath("$.message").value("Una etapa obligatoria no se puede omitir"));
+    }
+
+    @Test
     void createsVersionedRecipe() throws Exception {
         String recipeBody = """
             {"code":"qa-lager","name":"Lager QA","originalGravity":1.048,"targetFinalGravity":1.010,
@@ -151,12 +174,10 @@ class ProductionControllerTest {
                 .content("{\"recipeVersionId\":\"00000000-0000-0000-0000-000000000101\",\"plannedVolumeL\":200,\"batchKind\":\"TEST\",\"productCode\":\"CERV\"}"))
             .andExpect(status().isCreated()).andReturn().getResponse().getContentAsString();
         String batchId = objectMapper.readTree(released).get("id").asText();
-        mvc.perform(put("/api/v1/production/batches/" + batchId + "/ready-for-fermentation")
-                .contentType(MediaType.APPLICATION_JSON).content("{\"expectedRevision\":0}"))
-            .andExpect(status().isOk());
+        BatchView ready = advancePreparation(batchId);
         mvc.perform(put("/api/v1/production/batches/" + batchId + "/fermentation-assignment")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"tankId\":\"TANK-01\",\"transferredVolumeL\":200,\"expectedRevision\":1}"))
+                .content("{\"tankId\":\"TANK-01\",\"transferredVolumeL\":200,\"expectedRevision\":" + ready.revision() + "}"))
             .andExpect(status().isConflict())
             .andExpect(jsonPath("$.code").value("STATE_CONFLICT"));
     }
@@ -197,12 +218,10 @@ class ProductionControllerTest {
                 .content("{\"recipeVersionId\":\"00000000-0000-0000-0000-000000000101\",\"plannedVolumeL\":200,\"batchKind\":\"TEST\",\"productCode\":\"CERV\"}"))
             .andExpect(status().isCreated()).andReturn().getResponse().getContentAsString();
         String batchId = objectMapper.readTree(released).get("id").asText();
-        mvc.perform(put("/api/v1/production/batches/" + batchId + "/ready-for-fermentation")
-                .contentType(MediaType.APPLICATION_JSON).content("{\"expectedRevision\":0}"))
-            .andExpect(status().isOk());
+        BatchView ready = advancePreparation(batchId);
         mvc.perform(put("/api/v1/production/batches/" + batchId + "/fermentation-assignment")
                 .contentType(MediaType.APPLICATION_JSON)
-                .content("{\"tankId\":\"TANK-01\",\"transferredVolumeL\":200,\"expectedRevision\":1}"))
+                .content("{\"tankId\":\"TANK-01\",\"transferredVolumeL\":200,\"expectedRevision\":" + ready.revision() + "}"))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.tankId").value("TANK-01"));
 
@@ -314,5 +333,20 @@ class ProductionControllerTest {
         mvc.perform(get("/api/v1/fermentation/overview"))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$.tanks[0].setpointC").value(18.5));
+    }
+
+    private BatchView advancePreparation(String batchId) {
+        BatchView batch = service.overview().activeBatches().stream().filter(item -> item.id().equals(batchId))
+            .findFirst().orElseThrow();
+        for (BatchStageView stage : batch.executionStages().stream().filter(item -> item.order() <= 180).toList()) {
+            if ("COMPLETED".equals(stage.status()) || "SKIPPED".equals(stage.status())) continue;
+            batch = service.commandStage(batchId, stage.code(),
+                new StageCommandRequest("START", batch.revision(), stage.revision(), "", null, null), "qa-process");
+            BatchStageView started = batch.executionStages().stream().filter(item -> item.code().equals(stage.code()))
+                .findFirst().orElseThrow();
+            batch = service.commandStage(batchId, stage.code(),
+                new StageCommandRequest("COMPLETE", batch.revision(), started.revision(), "QA", null, null), "qa-process");
+        }
+        return batch;
     }
 }
