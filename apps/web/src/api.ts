@@ -1,6 +1,15 @@
 import type { AlarmHistory, Batch, BatchEvent, BatchEventInput, ControlMode, FermentationAlarm, FermentationHistory, Overview, PlantAsset, PlantAssetInput, PlantOverview, PlantProfile, PlantStorageLocation, PlantStorageLocationInput, PlantWarehouse, PlantWarehouseInput, ProductionOverview, Tank } from './types'
 
 async function request<T>(url: string, init?: RequestInit): Promise<T> {
+  if (import.meta.env.VITE_STATIC_PREVIEW === 'true') {
+    if (init?.method && init.method !== 'GET') throw new Error('Vista pública de demostración: los cambios están deshabilitados. Usa el servidor local para operar la planta.')
+    const response = await fetch(`${import.meta.env.BASE_URL}preview.json`)
+    if (!response.ok) throw new Error('No se pudieron cargar los datos de demostración.')
+    const snapshot = await response.json() as Record<string, T>
+    const data = snapshot[url.split('?')[0]]
+    if (data === undefined) throw new Error('Esta consulta no está incluida en la demostración pública.')
+    return data
+  }
   const response = await fetch(url, { ...init, headers: { 'Content-Type': 'application/json', 'X-Actor': 'local-webapp', ...init?.headers } })
   if (!response.ok) {
     const raw = await response.text()

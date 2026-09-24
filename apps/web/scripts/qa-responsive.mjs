@@ -97,6 +97,16 @@ try {
     return evaluation.result.value
   }
   const plant = await inspectLayout('Mi Planta')
+  if (process.env.QA_STATIC_PREVIEW === 'true') {
+    const submit = await send('Runtime.evaluate', { expression: `(() => {
+      if (!document.body.textContent.includes('Demostración pública')) throw new Error('Falta aviso público');
+      document.querySelector('form.plant-profile').requestSubmit();
+    })()` })
+    if (submit.exceptionDetails) throw new Error('No se pudo verificar el modo público')
+    await delay(300)
+    const blocked = await send('Runtime.evaluate', { returnByValue: true, expression: `document.body.textContent.includes('los cambios están deshabilitados')` })
+    if (!blocked.result.value) throw new Error('La demostración no bloqueó la escritura')
+  }
   await send('Runtime.evaluate', {
     expression: `([...document.querySelectorAll('button')].find(button => button.textContent.includes('Agregar bodega'))).click()`,
   })

@@ -2,6 +2,8 @@
 
 Plataforma modular para operar y gestionar una cervecería artesanal. El primer incremento cubre la fermentación de dos tanques con un chiller compartido en modo simulado.
 
+**[Demostración pública de solo lectura](https://raydan08x.github.io/sdbrewpi-platform/)** · [Repositorio](https://github.com/Raydan08x/sdbrewpi-platform). La demostración usa datos de ejemplo congelados; no conecta con la planta ni guarda cambios. Consulta [el despliegue en GitHub](docs/GITHUB_DEPLOYMENT.md) para distinguirla de la instalación completa con Spring Boot.
+
 ## Inicio rápido
 
 Requisito: Docker Desktop en ejecución.
