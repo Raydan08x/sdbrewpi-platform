@@ -16,8 +16,24 @@ class AuthControllerTest {
   String token=json.readTree(body).get("token").asText();
   mvc.perform(get("/api/v1/auth/session").header("Authorization","Bearer "+token)).andExpect(status().isOk()).andExpect(jsonPath("$.user.username").value("qa-admin"));
   mvc.perform(get("/api/v1/plant/overview").header("Authorization","Bearer "+token)).andExpect(status().isOk());
+  mvc.perform(post("/api/v1/users").header("Authorization","Bearer "+token).contentType(MediaType.APPLICATION_JSON).content("{\"username\":\"Operador1\",\"displayName\":\"Operador Uno\",\"role\":\"OPERATOR\",\"password\":\"clave-segura-qa\"}"))
+   .andExpect(status().isCreated()).andExpect(jsonPath("$.username").value("operador1")).andExpect(jsonPath("$.role").value("OPERATOR"));
+  mvc.perform(post("/api/v1/users").header("Authorization","Bearer "+token).contentType(MediaType.APPLICATION_JSON).content("{\"username\":\"operador1\",\"displayName\":\"Duplicado\",\"role\":\"VIEWER\",\"password\":\"clave-segura-qa\"}"))
+   .andExpect(status().isConflict());
+  mvc.perform(post("/api/v1/auth/login").contentType(MediaType.APPLICATION_JSON).content("{\"username\":\"operador1\",\"password\":\"clave-segura-qa\"}"))
+   .andExpect(status().isOk()).andExpect(jsonPath("$.user.role").value("OPERATOR"));
   mvc.perform(post("/api/v1/auth/logout").header("Authorization","Bearer "+token)).andExpect(status().isNoContent());
   mvc.perform(get("/api/v1/auth/session").header("Authorization","Bearer "+token)).andExpect(status().isUnauthorized());
+ }
+ @Test void requiresAuthenticationAndAdminRoleToRegisterUsers()throws Exception{
+  String request="{\"username\":\"viewer1\",\"displayName\":\"Visor Uno\",\"role\":\"VIEWER\",\"password\":\"clave-segura-qa\"}";
+  mvc.perform(post("/api/v1/users").contentType(MediaType.APPLICATION_JSON).content(request)).andExpect(status().isUnauthorized());
+  String adminBody=mvc.perform(post("/api/v1/auth/login").contentType(MediaType.APPLICATION_JSON).content("{\"username\":\"qa-admin\",\"password\":\"test-secret\"}")).andReturn().getResponse().getContentAsString();
+  String adminToken=json.readTree(adminBody).get("token").asText();
+  mvc.perform(post("/api/v1/users").header("Authorization","Bearer "+adminToken).contentType(MediaType.APPLICATION_JSON).content(request)).andExpect(status().isCreated());
+  String viewerBody=mvc.perform(post("/api/v1/auth/login").contentType(MediaType.APPLICATION_JSON).content("{\"username\":\"viewer1\",\"password\":\"clave-segura-qa\"}")).andReturn().getResponse().getContentAsString();
+  String viewerToken=json.readTree(viewerBody).get("token").asText();
+  mvc.perform(post("/api/v1/users").header("Authorization","Bearer "+viewerToken).contentType(MediaType.APPLICATION_JSON).content(request)).andExpect(status().isForbidden()).andExpect(jsonPath("$.code").value("FORBIDDEN"));
  }
  @Test void rejectsWrongPassword()throws Exception{mvc.perform(post("/api/v1/auth/login").contentType(MediaType.APPLICATION_JSON).content("{\"username\":\"qa-admin\",\"password\":\"incorrecta\"}")).andExpect(status().isUnauthorized()).andExpect(jsonPath("$.message").value("Usuario o contraseña incorrectos"));}
 }

@@ -1,4 +1,4 @@
-import type { AlarmHistory, AuthSession, Batch, BatchEvent, BatchEventInput, ControlMode, FermentationAlarm, FermentationHistory, InventoryItem, InventoryLot, InventoryMovement, InventoryOverview, Overview, PlantAsset, PlantAssetInput, PlantOverview, PlantProfile, PlantStorageLocation, PlantStorageLocationInput, PlantWarehouse, PlantWarehouseInput, ProductionOverview, Tank } from './types'
+import type { AlarmHistory, AuthSession, AuthUser, Batch, BatchEvent, BatchEventInput, ControlMode, FermentationAlarm, FermentationHistory, InventoryItem, InventoryLot, InventoryMovement, InventoryOverview, Overview, PlantAsset, PlantAssetInput, PlantOverview, PlantProfile, PlantStorageLocation, PlantStorageLocationInput, PlantWarehouse, PlantWarehouseInput, ProductionOverview, Tank } from './types'
 
 const TOKEN_KEY='sdbrewpi.auth.token'
 export const getStoredToken=()=>sessionStorage.getItem(TOKEN_KEY)
@@ -35,6 +35,7 @@ export const login = async (username:string,password:string) => {
 }
 export const getAuthSession = () => request<AuthSession>('/api/v1/auth/session')
 export const logout = async () => {try{await request<void>('/api/v1/auth/logout',{method:'POST'})}finally{clearStoredToken()}}
+export const registerUser = (values:{username:string;displayName:string;role:string;password:string}) => request<AuthUser>('/api/v1/users',{method:'POST',body:JSON.stringify(values)})
 
 export const getOverview = () => request<Overview>('/api/v1/fermentation/overview')
 export const getTankHistory = (tankId: string) => request<FermentationHistory>(`/api/v1/fermentation/tanks/${tankId}/history?hours=24&limit=720`)

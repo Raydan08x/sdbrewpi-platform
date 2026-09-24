@@ -15,6 +15,7 @@
 - El lote maestro se genera al liberar la orden con `PRODUCTO-AAMM-CLASE+SECUENCIA`: `CERV-2609-L001`, `CERV-2609-P001` o `CERV-2609-T001`. `HSEL` queda reservado para hard seltzer. La secuencia es independiente por producto, mes y clase.
 - Las corridas de envasado serán hijas del lote (`-K01` barriles, `-B01` botellas, `-C01` latas). El número del barril no forma parte de la corrida: cada recipiente tendrá un identificador permanente `BRL-001`, `BRL-002`, etc., asociado dentro del batch record. Se descartó el formato `K101` porque no escala al superar diez barriles.
 - La WebApp exige autenticación local para todas las APIs operativas. Las contraseñas se guardan con PBKDF2-HMAC-SHA256, las sesiones duran 12 horas y los tokens se almacenan como hash. Los dos accesos iniciales tienen rol `ADMIN`; la demostración de GitHub Pages usa un acceso separado de solo lectura.
+- Los administradores pueden registrar cuentas desde la WebApp. `ADMIN` gestiona usuarios y opera, `OPERATOR` opera sin administrar usuarios y `VIEWER` solo puede consultar mediante solicitudes GET.
 
 ## Hardware identificado
 

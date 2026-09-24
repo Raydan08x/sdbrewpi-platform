@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react'
-import { BarChart3, Beer, Boxes, Building2, ChevronRight, CircleDollarSign, Factory, LogOut, PackageSearch, Users } from 'lucide-react'
+import { BarChart3, Beer, Boxes, Building2, ChevronRight, CircleDollarSign, Factory, LogOut, PackageSearch, UserPlus, Users } from 'lucide-react'
 import PlantPage from './PlantPage'
 import ProductionPage from './ProductionPage'
 import InventoryPage from './InventoryPage'
 import LoginPage from './LoginPage'
 import { clearStoredToken, getAuthSession, getStoredToken, logout } from './api'
 import type { AuthUser } from './types'
+import UserRegistration from './UserRegistration'
 
 const modules = [
   { id: 'plant', label: 'Mi Planta', icon: Building2, implemented: true },
@@ -22,6 +23,7 @@ export default function App() {
   const preview = import.meta.env.VITE_STATIC_PREVIEW === 'true'
   const [authState,setAuthState]=useState<'checking'|'signed-out'|'signed-in'>(()=>preview||!getStoredToken()?'signed-out':'checking')
   const [user,setUser]=useState<AuthUser|null>(null)
+  const [registering,setRegistering]=useState(false)
   const [page, setPage] = useState<'plant' | 'inventory' | 'production'>('plant')
   useEffect(()=>{if(!preview&&getStoredToken())getAuthSession().then(session=>{setUser(session.user);setAuthState('signed-in')}).catch(()=>{clearStoredToken();setAuthState('signed-out')})},[preview])
   if(authState==='checking')return <div className="auth-checking">Verificando sesión…</div>
@@ -31,8 +33,10 @@ export default function App() {
     <aside>
       <div className="brand"><div className="brand-mark"><Beer size={24}/></div><div><b>SDBrewPi</b><span>BREWERY OS</span></div></div>
       <nav>{modules.map(({id,label,icon:Icon,implemented}) => <button key={id} className={`${page === id ? 'active ' : ''}${implemented ? 'implemented' : ''}`} disabled={!implemented} onClick={() => { if (id === 'plant' || id === 'inventory' || id === 'production') setPage(id) }}><Icon size={19}/><span>{label}</span>{page === id ? <ChevronRight size={16}/> : !implemented ? <small>Próximamente</small> : null}</button>)}</nav>
-      <div className="system-card"><span className="live-dot"/>{preview ? 'GitHub Pages' : user?.displayName}<b>{preview ? 'Demostración estática' : user?.role}</b><small>Hardware bloqueado</small><button onClick={()=>void closeSession()}><LogOut size={13}/>Cerrar sesión</button></div>
+      <div className="system-card"><span className="live-dot"/>{preview ? 'GitHub Pages' : user?.displayName}<b>{preview ? 'Demostración estática' : user?.role}</b><small>Hardware bloqueado</small>{!preview&&user?.role==='ADMIN'&&<button onClick={()=>setRegistering(true)}><UserPlus size={13}/>Registrar usuario</button>}<button onClick={()=>void closeSession()}><LogOut size={13}/>Cerrar sesión</button></div>
     </aside>
     {page === 'plant' ? <PlantPage/> : page === 'inventory' ? <InventoryPage/> : <ProductionPage/>}
+    {!preview&&user?.role==='ADMIN'&&<button className="mobile-user-trigger" aria-label="Registrar usuario" onClick={()=>setRegistering(true)}><UserPlus size={18}/></button>}
+    {registering&&<UserRegistration onClose={()=>setRegistering(false)}/>}
   </div></>
 }
