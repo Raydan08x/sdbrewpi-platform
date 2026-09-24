@@ -112,6 +112,21 @@ try {
   })
   await delay(300)
   const warehouseEditor = await inspectLayout('Editor de bodega')
+  await send('Runtime.evaluate', { expression: `document.querySelector('[aria-label="Cerrar editor de bodega"]')?.click()` })
+  await send('Runtime.evaluate', {
+    expression: `([...document.querySelectorAll('nav button')].find(button => button.textContent.includes('Inventarios'))).click()`,
+  })
+  await delay(700)
+  const inventory = await inspectLayout('Inventarios')
+  const inventoryGuard = await send('Runtime.evaluate', { returnByValue: true, expression: `(() => {
+    if (!document.body.textContent.includes('MALTA-PALE')) throw new Error('Falta el artículo de demostración');
+    const create = [...document.querySelectorAll('button')].find(button => button.textContent.includes('Nuevo artículo'));
+    if (!create) throw new Error('Falta alta de artículo');
+    create.click(); return true;
+  })()` })
+  if (inventoryGuard.exceptionDetails) throw new Error('Falló el módulo Inventarios')
+  await delay(200)
+  const inventoryEditor = await inspectLayout('Nuevo artículo de inventario')
   await send('Runtime.evaluate', {
     expression: `([...document.querySelectorAll('nav button')].find(button => button.textContent.includes('Producción'))).click()`,
   })
@@ -180,7 +195,7 @@ try {
   const productionDesktop = await inspectLayout('Producción escritorio')
   const desktopStageGuard = await send('Runtime.evaluate', { returnByValue: true, expression: `Boolean(document.querySelector('.production-stage-panel'))` })
   if (!desktopStageGuard.result.value) throw new Error('Falta el batch record en Producción escritorio')
-  const results = [plant, warehouseEditor, production, orderEditor, stageExecution, fermentation, desktop, productionDesktop]
+  const results = [plant, warehouseEditor, inventory, inventoryEditor, production, orderEditor, stageExecution, fermentation, desktop, productionDesktop]
   console.log(JSON.stringify(results, null, 2))
   socket.close()
   if (results.some(result => result.documentWidth > result.viewportWidth || result.offenders.length > 0)) process.exitCode = 1

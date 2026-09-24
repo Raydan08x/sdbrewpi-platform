@@ -2025,5 +2025,16 @@
       "quantity": null,
       "unit": null
     }
-  ]
+  ],
+  "/api/v1/inventory/overview": {
+    "generatedAt": "2026-09-24T01:00:21.200809100Z",
+    "items": [
+      {"id":"demo-item-1","siteId":"00000000-0000-0000-0000-000000000401","code":"MALTA-PALE","name":"Malta Pale Ale","category":"RAW_MATERIAL","baseUnit":"KG","trackLots":true,"minimumStock":25,"notes":"Ejemplo público","revision":0,"active":true,"updatedAt":"2026-09-24T01:00:21Z"}
+    ],
+    "lots": [],
+    "balances": [],
+    "recentMovements": [],
+    "lowStockItems": 1,
+    "quarantinedLots": 0
+  }
 }

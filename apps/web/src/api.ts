@@ -1,4 +1,4 @@
-import type { AlarmHistory, Batch, BatchEvent, BatchEventInput, ControlMode, FermentationAlarm, FermentationHistory, Overview, PlantAsset, PlantAssetInput, PlantOverview, PlantProfile, PlantStorageLocation, PlantStorageLocationInput, PlantWarehouse, PlantWarehouseInput, ProductionOverview, Tank } from './types'
+import type { AlarmHistory, Batch, BatchEvent, BatchEventInput, ControlMode, FermentationAlarm, FermentationHistory, InventoryItem, InventoryLot, InventoryMovement, InventoryOverview, Overview, PlantAsset, PlantAssetInput, PlantOverview, PlantProfile, PlantStorageLocation, PlantStorageLocationInput, PlantWarehouse, PlantWarehouseInput, ProductionOverview, Tank } from './types'
 
 async function request<T>(url: string, init?: RequestInit): Promise<T> {
   if (import.meta.env.VITE_STATIC_PREVIEW === 'true') {
@@ -27,6 +27,10 @@ export const getTankHistory = (tankId: string) => request<FermentationHistory>(`
 export const getAlarmHistory = () => request<AlarmHistory>('/api/v1/fermentation/alarms?hours=168&limit=200')
 export const getProductionOverview = () => request<ProductionOverview>('/api/v1/production/overview')
 export const getPlantOverview = () => request<PlantOverview>('/api/v1/plant/overview')
+export const getInventoryOverview = () => request<InventoryOverview>('/api/v1/inventory/overview')
+export const createInventoryItem = (siteId:string, values:{code:string;name:string;category:string;baseUnit:string;trackLots:boolean;minimumStock:number;notes:string}) => request<InventoryItem>(`/api/v1/inventory/sites/${siteId}/items`,{method:'POST',body:JSON.stringify(values)})
+export const createInventoryLot = (itemId:string, values:{internalCode:string;supplierLot:string;expiryDate:string|null;qualityStatus:string;notes:string}) => request<InventoryLot>(`/api/v1/inventory/items/${itemId}/lots`,{method:'POST',body:JSON.stringify(values)})
+export const createInventoryMovement = (values:{itemId:string;lotId:string|null;warehouseId:string;locationId:string|null;movementType:string;quantity:number;reference:string;notes:string}) => request<InventoryMovement>('/api/v1/inventory/movements',{method:'POST',body:JSON.stringify(values)})
 
 export const updatePlantProfile = (site: PlantProfile, values: Omit<PlantProfile, 'id' | 'code' | 'revision' | 'updatedAt'>) =>
   request<PlantProfile>('/api/v1/plant/sites/' + site.id, {
