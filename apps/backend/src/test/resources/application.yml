@@ -6,6 +6,8 @@ spring:
   flyway:
     enabled: true
 sdbrewpi:
+  auth:
+    enabled: false
   hardware:
     enabled: false
   simulation:

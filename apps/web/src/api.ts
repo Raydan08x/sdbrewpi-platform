@@ -1,4 +1,8 @@
-import type { AlarmHistory, Batch, BatchEvent, BatchEventInput, ControlMode, FermentationAlarm, FermentationHistory, InventoryItem, InventoryLot, InventoryMovement, InventoryOverview, Overview, PlantAsset, PlantAssetInput, PlantOverview, PlantProfile, PlantStorageLocation, PlantStorageLocationInput, PlantWarehouse, PlantWarehouseInput, ProductionOverview, Tank } from './types'
+import type { AlarmHistory, AuthSession, Batch, BatchEvent, BatchEventInput, ControlMode, FermentationAlarm, FermentationHistory, InventoryItem, InventoryLot, InventoryMovement, InventoryOverview, Overview, PlantAsset, PlantAssetInput, PlantOverview, PlantProfile, PlantStorageLocation, PlantStorageLocationInput, PlantWarehouse, PlantWarehouseInput, ProductionOverview, Tank } from './types'
+
+const TOKEN_KEY='sdbrewpi.auth.token'
+export const getStoredToken=()=>sessionStorage.getItem(TOKEN_KEY)
+export const clearStoredToken=()=>sessionStorage.removeItem(TOKEN_KEY)
 
 async function request<T>(url: string, init?: RequestInit): Promise<T> {
   if (import.meta.env.VITE_STATIC_PREVIEW === 'true') {
@@ -10,7 +14,8 @@ async function request<T>(url: string, init?: RequestInit): Promise<T> {
     if (data === undefined) throw new Error('Esta consulta no está incluida en la demostración pública.')
     return data
   }
-  const response = await fetch(url, { ...init, headers: { 'Content-Type': 'application/json', 'X-Actor': 'local-webapp', ...init?.headers } })
+  const token=getStoredToken()
+  const response = await fetch(url, { ...init, headers: { 'Content-Type': 'application/json', 'X-Actor': 'local-webapp', ...(token?{Authorization:`Bearer ${token}`} : {}), ...init?.headers } })
   if (!response.ok) {
     const raw = await response.text()
     const message = (() => {
@@ -19,8 +24,17 @@ async function request<T>(url: string, init?: RequestInit): Promise<T> {
     })()
     throw new Error(message || `No se pudo completar la operación (HTTP ${response.status})`)
   }
+  if (response.status === 204) return undefined as T
   return response.json()
 }
+
+export const login = async (username:string,password:string) => {
+  const session=await request<AuthSession>('/api/v1/auth/login',{method:'POST',body:JSON.stringify({username,password})})
+  if(session.token)sessionStorage.setItem(TOKEN_KEY,session.token)
+  return session
+}
+export const getAuthSession = () => request<AuthSession>('/api/v1/auth/session')
+export const logout = async () => {try{await request<void>('/api/v1/auth/logout',{method:'POST'})}finally{clearStoredToken()}}
 
 export const getOverview = () => request<Overview>('/api/v1/fermentation/overview')
 export const getTankHistory = (tankId: string) => request<FermentationHistory>(`/api/v1/fermentation/tanks/${tankId}/history?hours=24&limit=720`)

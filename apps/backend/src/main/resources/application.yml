@@ -13,6 +13,8 @@ management:
       exposure:
         include: health,info
 sdbrewpi:
+  auth:
+    enabled: ${AUTH_ENABLED:true}
   hardware:
     enabled: ${HARDWARE_ENABLED:false}
   simulation:

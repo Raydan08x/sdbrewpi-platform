@@ -6,5 +6,6 @@ import './responsive.css'
 import './plant.css'
 import './production.css'
 import './inventory.css'
+import './login.css'
 
 createRoot(document.getElementById('root')!).render(<StrictMode><App /></StrictMode>)

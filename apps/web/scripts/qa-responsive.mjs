@@ -96,6 +96,18 @@ try {
     })
     return evaluation.result.value
   }
+  const login = await inspectLayout('Login')
+  const loginGuard = await send('Runtime.evaluate', { returnByValue: true, expression: `(() => {
+    if (!document.body.textContent.includes('SDBrewPi Control')) throw new Error('Falta identidad del login');
+    if (!document.querySelector('input[autocomplete="username"]')) throw new Error('Falta campo de usuario');
+    if (!document.querySelector('input[autocomplete="current-password"]')) throw new Error('Falta campo de contraseña');
+    return true;
+  })()` })
+  if (loginGuard.exceptionDetails) throw new Error('Falló la pantalla de acceso')
+  if (process.env.QA_STATIC_PREVIEW === 'true') {
+    await send('Runtime.evaluate', { expression: `([...document.querySelectorAll('button')].find(button => button.textContent.includes('Ver demostración'))).click()` })
+    await delay(900)
+  }
   const plant = await inspectLayout('Mi Planta')
   if (process.env.QA_STATIC_PREVIEW === 'true') {
     const submit = await send('Runtime.evaluate', { expression: `(() => {
@@ -195,7 +207,7 @@ try {
   const productionDesktop = await inspectLayout('Producción escritorio')
   const desktopStageGuard = await send('Runtime.evaluate', { returnByValue: true, expression: `Boolean(document.querySelector('.production-stage-panel'))` })
   if (!desktopStageGuard.result.value) throw new Error('Falta el batch record en Producción escritorio')
-  const results = [plant, warehouseEditor, inventory, inventoryEditor, production, orderEditor, stageExecution, fermentation, desktop, productionDesktop]
+  const results = [login, plant, warehouseEditor, inventory, inventoryEditor, production, orderEditor, stageExecution, fermentation, desktop, productionDesktop]
   console.log(JSON.stringify(results, null, 2))
   socket.close()
   if (results.some(result => result.documentWidth > result.viewportWidth || result.offenders.length > 0)) process.exitCode = 1

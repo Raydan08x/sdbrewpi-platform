@@ -298,3 +298,5 @@ export interface InventoryLot { id:string; itemId:string; internalCode:string; s
 export interface InventoryBalance { itemId:string; itemCode:string; itemName:string; category:string; baseUnit:string; warehouseId:string; warehouseCode:string; warehouseName:string; locationId:string|null; locationCode:string|null; lotId:string|null; lotCode:string|null; qualityStatus:string|null; quantity:number; minimumStock:number }
 export interface InventoryMovement { id:string; itemId:string; itemCode:string; lotId:string|null; lotCode:string|null; warehouseId:string; warehouseCode:string; locationId:string|null; locationCode:string|null; movementType:string; quantity:number; reference:string; notes:string; actor:string; occurredAt:string }
 export interface InventoryOverview { generatedAt:string; items:InventoryItem[]; lots:InventoryLot[]; balances:InventoryBalance[]; recentMovements:InventoryMovement[]; lowStockItems:number; quarantinedLots:number }
+export interface AuthUser { id:string; username:string; displayName:string; role:string }
+export interface AuthSession { token?:string; expiresAt:string; user:AuthUser }
